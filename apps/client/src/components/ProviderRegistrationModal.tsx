@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect } from 'react';
-import { useCreateProvider } from '../../hooks/useCreateProvider';
-import { Button, Input, Modal } from '../common';
-import type { Profile } from '../../contexts/AuthContext'; // 👈 Fíjate en el 'type'
+import { useCreateProvider } from '../hooks/useCreateProvider';
+import { Button, Input, Modal } from './common';
+import type { Profile } from '../contexts/AuthContext'; // 👈 Fíjate en el 'type'
 
 type Props = {
   isOpen: boolean;

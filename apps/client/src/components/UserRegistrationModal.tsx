@@ -93,6 +93,16 @@ export default function UserRegistrationModal({ isOpen, onClose, userToEdit, onU
           disabled={!!userToEdit}
           placeholder="correo@ejemplo.com"
         />
+
+        {!userToEdit && (
+          <Input 
+            label="Contraseña Temporal" 
+            type="password" 
+            value={password} 
+            onChange={(e) => setPassword(e.target.value)} 
+            required 
+          />
+        )}
         
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-semibold text-neutral-700">Rol del Sistema</label>

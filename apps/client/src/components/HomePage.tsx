@@ -1,4 +1,4 @@
-import { Button, DashboardLayout } from './common';
+import { DashboardLayout } from './common';
 import { BriefcaseIcon, ReceiptIcon, UserIcon } from './icons';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
@@ -9,7 +9,10 @@ interface ActionCardProps {
   description: string;
   icon: React.ElementType;
   onClick: () => void;
-  color: 'blue' | 'green' | 'amber';
+  accent: string;
+  accentBg: string;
+  btnGradient: string;
+  features: string[];
 }
 
 const ActionCard = ({
@@ -17,173 +20,185 @@ const ActionCard = ({
   description,
   icon: Icon,
   onClick,
-  color,
-}: ActionCardProps) => {
-  const colorStyles = {
-    blue: {
-      icon: 'text-blue-600 bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-100',
-      accent: 'from-blue-500 to-cyan-500',
-      hover: 'group-hover:shadow-blue-500/20',
-    },
-    green: {
-      icon: 'text-green-600 bg-gradient-to-br from-green-50 to-emerald-50 border-green-100',
-      accent: 'from-green-500 to-emerald-500',
-      hover: 'group-hover:shadow-green-500/20',
-    },
-    amber: {
-      icon: 'text-amber-600 bg-gradient-to-br from-amber-50 to-orange-50 border-amber-100',
-      accent: 'from-amber-500 to-orange-500',
-      hover: 'group-hover:shadow-amber-500/20',
-    },
-  };
-
-  const styles = colorStyles[color];
-
-  return (
-    <div className={`group bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-lg ${styles.hover} transition-all duration-300 flex flex-col justify-between hover:-translate-y-1 relative overflow-hidden`}>
-      {/* Decorative gradient corner */}
-      <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-br ${styles.accent} opacity-5 rounded-bl-full transition-opacity duration-300 group-hover:opacity-10`} />
-      
-      <div className="relative z-10">
-        <div
-          className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-4 border ${styles.icon} transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3 shadow-sm`}
-        >
-          <Icon className="w-7 h-7" />
-        </div>
-        <h3 className="text-xl font-bold text-slate-800 mb-2 group-hover:text-slate-900 transition-colors">
-          {title}
-        </h3>
-        <p className="text-sm text-slate-500 mb-6 leading-relaxed">
-          {description}
-        </p>
+  accent,
+  accentBg,
+  btnGradient,
+  features,
+}: ActionCardProps) => (
+  <div style={{
+    background: '#ffffff',
+    border: '1px solid #e2e8f0',
+    borderRadius: 20,
+    padding: 24,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 16,
+    boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
+    height: '100%',
+    transition: 'transform 0.2s, box-shadow 0.2s, border-color 0.2s',
+  }}
+    onMouseEnter={e => {
+      (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-3px)';
+      (e.currentTarget as HTMLDivElement).style.boxShadow = '0 12px 32px rgba(0,0,0,0.09)';
+      (e.currentTarget as HTMLDivElement).style.borderColor = '#cbd5e1';
+    }}
+    onMouseLeave={e => {
+      (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)';
+      (e.currentTarget as HTMLDivElement).style.boxShadow = '0 2px 12px rgba(0,0,0,0.04)';
+      (e.currentTarget as HTMLDivElement).style.borderColor = '#e2e8f0';
+    }}
+  >
+    {/* Header */}
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+      <div style={{
+        width: 44, height: 44, borderRadius: 12,
+        background: accentBg, color: accent,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0,
+      }}>
+        <Icon style={{ width: 20, height: 20 }} />
       </div>
-      
-      <Button
-        onClick={onClick}
-        className={`w-full bg-gradient-to-r ${styles.accent} hover:opacity-90 text-white font-semibold py-3 rounded-xl shadow-md transition-all duration-300 relative z-10`}
-      >
-        Ver Tabla
-      </Button>
+      <div>
+        <div style={{ fontSize: 15, fontWeight: 600, color: '#1e293b', marginBottom: 4 }}>{title}</div>
+        <div style={{ fontSize: 12.5, color: '#94a3b8', lineHeight: 1.5 }}>{description}</div>
+      </div>
     </div>
-  );
-};
+
+    {/* Divider */}
+    <div style={{ height: 1, background: '#f1f5f9' }} />
+
+    {/* Features */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
+      {features.map(f => (
+        <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: '#64748b' }}>
+          <div style={{ width: 5, height: 5, borderRadius: '50%', background: accent, flexShrink: 0 }} />
+          {f}
+        </div>
+      ))}
+    </div>
+
+    {/* Button */}
+    <button
+      onClick={onClick}
+      style={{
+        width: '100%', padding: '11px', borderRadius: 11,
+        fontSize: 13, fontWeight: 600, fontFamily: 'DM Sans, sans-serif',
+        cursor: 'pointer', border: 'none', color: 'white',
+        background: btnGradient,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+        transition: 'filter 0.15s',
+      }}
+      onMouseEnter={e => (e.currentTarget.style.filter = 'brightness(1.07)')}
+      onMouseLeave={e => (e.currentTarget.style.filter = 'brightness(1)')}
+    >
+      Ver tabla
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M5 12h14M12 5l7 7-7 7"/>
+      </svg>
+    </button>
+  </div>
+);
+
+const MODULE_CARDS = [
+  {
+    key: 'usuarios',
+    title: 'Usuarios',
+    description: 'Administra los roles y permisos del sistema.',
+    icon: UserIcon,
+    accent: '#6366f1',
+    accentBg: 'rgba(99,102,241,0.08)',
+    btnGradient: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
+    route: '/users',
+    adminOnly: true,
+    features: ['Crear y editar usuarios', 'Asignar roles y permisos', 'Activar o desactivar cuentas'],
+  },
+  {
+    key: 'proveedores',
+    title: 'Proveedores',
+    description: 'Gestiona el directorio de proveedores.',
+    icon: BriefcaseIcon,
+    accent: '#f59e0b',
+    accentBg: 'rgba(245,158,11,0.08)',
+    btnGradient: 'linear-gradient(135deg,#f59e0b,#d97706)',
+    route: '/providers',
+    adminOnly: true,
+    features: ['Registrar nuevos proveedores', 'Editar información de contacto', 'Consultar historial de facturas'],
+  },
+  {
+    key: 'facturas',
+    title: 'Facturas',
+    description: 'Controla el historial de facturación.',
+    icon: ReceiptIcon,
+    accent: '#10b981',
+    accentBg: 'rgba(16,185,129,0.08)',
+    btnGradient: 'linear-gradient(135deg,#10b981,#059669)',
+    route: '/bills',
+    adminOnly: false,
+    features: ['Crear y gestionar facturas', 'Filtrar por N° de Siniestro, Proveedor, Lote o estado', 'Acceder a detalles y auditoría de cada factura'],
+  },
+];
 
 export default function HomePage() {
-  const { user, isAdmin } = useAuth();
+  const { isAdmin } = useAuth();
   const navigate = useNavigate();
 
+  const visibleCards = MODULE_CARDS.filter(c => !c.adminOnly || isAdmin);
+
   return (
-    <DashboardLayout
-      title="Dashboard"
-      subtitle={`Bienvenido de nuevo, ${user?.user_metadata?.name || 'Usuario'}`}
-    >
-      {/* Background decorative elements */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
-        <div className="absolute top-20 right-10 w-64 h-64 bg-blue-400/5 rounded-full blur-3xl animate-float" />
-        <div className="absolute bottom-20 left-10 w-80 h-80 bg-cyan-400/5 rounded-full blur-3xl animate-float-delayed" />
-      </div>
+    <DashboardLayout>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
 
-      <div className="max-w-7xl mx-auto relative">
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-4">
-          {/* Perfil más estilizado a la izquierda */}
-          <div className="lg:col-span-1">
-            <div className="sticky top-6 animate-fade-in">
-              <UserProfileCard />
-            </div>
-          </div>
+        {/* Profile card — fila completa arriba */}
+        <div style={{ animation: 'hp-fadeUp 0.35s cubic-bezier(0.16,1,0.3,1) both' }}>
+          <UserProfileCard />
+        </div>
 
-          {/* Grid de Acciones */}
-          <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {isAdmin ? (
-              <>
-                <div className="animate-fade-in-up" style={{ animationDelay: '100ms' }}>
-                  <ActionCard
-                    title="Usuarios"
-                    description="Administra los roles y crea nuevos usuarios para el sistema."
-                    icon={UserIcon}
-                    color="blue"
-                    onClick={() => navigate('/users')}
-                  />
-                </div>
-                <div className="animate-fade-in-up" style={{ animationDelay: '200ms' }}>
-                  <ActionCard
-                    title="Proveedores"
-                    description="Gestiona los proveedores y su información de contacto."
-                    icon={BriefcaseIcon}
-                    color="amber"
-                    onClick={() => navigate('/providers')}
-                  />
-                </div>
-              </>
-            ) : null}
-            <div className="animate-fade-in-up" style={{ animationDelay: isAdmin ? '300ms' : '100ms' }}>
+        {/* Label de módulos */}
+        <div style={{
+          fontSize: 11, fontWeight: 600, letterSpacing: 2,
+          textTransform: 'uppercase', color: '#94a3b8',
+        }}>
+          Módulos del sistema
+        </div>
+
+        {/* Cards de módulos — fila de 3 (o las que correspondan al rol) */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(${visibleCards.length}, 1fr)`,
+          gap: 16,
+          alignItems: 'stretch',
+        }}>
+          {visibleCards.map((card, i) => (
+            <div
+              key={card.key}
+              style={{ animation: `hp-fadeUp 0.4s cubic-bezier(0.16,1,0.3,1) ${(i + 1) * 70}ms both` }}
+            >
               <ActionCard
-                title="Facturas"
-                description="Visualiza, crea y gestiona el historial de facturación."
-                icon={ReceiptIcon}
-                color="green"
-                onClick={() => navigate('/bills')}
+                title={card.title}
+                description={card.description}
+                icon={card.icon}
+                accent={card.accent}
+                accentBg={card.accentBg}
+                btnGradient={card.btnGradient}
+                onClick={() => navigate(card.route)}
+                features={card.features}
               />
             </div>
-          </div>
+          ))}
         </div>
+
       </div>
 
       <style>{`
-        @keyframes fade-in {
-          from {
-            opacity: 0;
-            transform: translateY(10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+        @keyframes hp-fadeUp {
+          from { opacity: 0; transform: translateY(16px); }
+          to   { opacity: 1; transform: translateY(0); }
         }
 
-        @keyframes fade-in-up {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
+        @media (max-width: 768px) {
+          .hp-modules-grid {
+            grid-template-columns: 1fr !important;
           }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        @keyframes float {
-          0%, 100% {
-            transform: translate(0, 0);
-          }
-          50% {
-            transform: translate(20px, -20px);
-          }
-        }
-
-        @keyframes float-delayed {
-          0%, 100% {
-            transform: translate(0, 0);
-          }
-          50% {
-            transform: translate(-20px, 20px);
-          }
-        }
-
-        .animate-fade-in {
-          animation: fade-in 0.6s ease-out;
-        }
-
-        .animate-fade-in-up {
-          animation: fade-in-up 0.6s ease-out backwards;
-        }
-
-        .animate-float {
-          animation: float 8s ease-in-out infinite;
-        }
-
-        .animate-float-delayed {
-          animation: float-delayed 10s ease-in-out infinite 2s;
         }
       `}</style>
     </DashboardLayout>

@@ -1,13 +1,13 @@
 import React from 'react';
-import { DashboardLayout } from './common';
-import { ProviderRegistrationModal, ProvidersTable } from './providers';
+import { DashboardLayout, Button } from './common';
+import ProviderRegistrationModal from './ProviderRegistrationModal';
+import ProvidersTable from './ProvidersTable';
 import { useGetAllProviders } from '../hooks/useGetAllProviders';
 import type { Profile } from '../contexts/AuthContext';
 
 export default function ProvidersPage() {
-  const { providers, loading, updateProvider, deleteProvider, refetch } =
-    useGetAllProviders();
-
+  const { providers, loading, updateProvider, deleteProvider } = useGetAllProviders(); // ← SIN refetch
+  
   const [modalIsOpen, setModalIsOpen] = React.useState(false);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [providerToEdit, setProviderToEdit] = React.useState<Profile | null>(
@@ -31,9 +31,10 @@ export default function ProvidersPage() {
 
   return (
     <DashboardLayout title="Gestión de Proveedores" returnTo="/">
-      {/* SECCIÓN DE BOTÓN Y FILTRO (Actualizada para que coincida con tu imagen) */}
+      
+      {/* SECCIÓN DE BOTÓN Y FILTRO */}
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6">
-        {/* Input de Búsqueda estilizado */}
+        
         <div className="flex bg-white border border-neutral-200 rounded-lg p-1 shadow-sm w-full sm:w-auto">
           <div className="flex items-center px-3 text-neutral-400">
             <svg
@@ -59,12 +60,8 @@ export default function ProvidersPage() {
           />
         </div>
 
-        {/* Botón Nuevo Proveedor */}
-        <button
-          onClick={() => {
-            setProviderToEdit(null);
-            setModalIsOpen(true);
-          }}
+        <Button 
+          onClick={() => { setProviderToEdit(null); setModalIsOpen(true); }}
           className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-all duration-200"
         >
           <svg
@@ -81,7 +78,7 @@ export default function ProvidersPage() {
             />
           </svg>
           <span>Nuevo Proveedor</span>
-        </button>
+        </Button>
       </div>
 
       {/* Tabla de Proveedores */}
@@ -93,13 +90,19 @@ export default function ProvidersPage() {
         onDelete={handleDelete}
       />
 
-      {/* Modal */}
+      {/* Modal - REALTIME AHORA FUNCIONA */}
       <ProviderRegistrationModal
         isOpen={modalIsOpen}
         onClose={() => setModalIsOpen(false)}
         providerToEdit={providerToEdit}
         onUpdate={updateProvider}
-        onProviderRegistered={refetch}
+        onProviderRegistered={() => {
+          console.log('');
+          console.log('✅✅✅ PROVEEDOR GUARDADO EXITOSAMENTE ✅✅✅');
+          console.log('   Esperando actualización automática vía Realtime...');
+          console.log('');
+          // NO llamar refetch - Realtime se encargará
+        }}
       />
     </DashboardLayout>
   );

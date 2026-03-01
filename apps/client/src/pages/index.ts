@@ -8,3 +8,4 @@ export { default as ResetPassword } from './Reset-password';
 export { default as CreateBillPage } from './CreateBills';
 export { default as BillDetailsPage } from './BillsDetailsPage';
 export { default as BillsPage } from './Bills';
+export { default as ProvidersPage } from './Providers';

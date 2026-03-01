@@ -22,14 +22,28 @@ export default function SignInPagePlayful() {
     setErrorMsg(null);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      // ✅ PASO 1: Limpiar cualquier sesión anterior
+      await supabase.auth.signOut();
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      // ✅ PASO 2: Pequeño delay para asegurar que se limpió todo
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      // ✅ PASO 3: Iniciar sesión con las nuevas credenciales
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) throw error;
 
-      console.log('Login exitoso');
+      // ✅ PASO 4: Guardar el ID del nuevo usuario
+      if (data.user) {
+        localStorage.setItem('current_user_id', data.user.id);
+      }
+
+      console.log('✅ Login exitoso');
       navigate('/');
     } catch (error: any) {
       setErrorMsg(error.message || 'Error al iniciar sesión');

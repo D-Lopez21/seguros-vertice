@@ -1,5 +1,5 @@
-import { EditIcon, TrashIcon } from '../icons';
-import type { Profile } from '../../contexts/AuthContext';
+import { EditIcon, TrashIcon } from './icons';
+import type { Profile } from '../contexts/AuthContext';
 
 interface ProvidersTableProps {
   providers: Profile[]; // Recibe los datos del padre

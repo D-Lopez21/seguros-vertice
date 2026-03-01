@@ -1,5 +1,5 @@
 import './App.css';
-import React from 'react';
+import React, { useEffect } from 'react'; // ← Agrega useEffect aquí
 import {
   createBrowserRouter,
   RouterProvider,
@@ -16,11 +16,12 @@ import {
   CreateBillPage,
   BillDetailsPage,
   BillsPage,
+  ProvidersPage,
 } from './pages';
 import { AuthProvider } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/common/ProtectedRoute';
 import { useAuth } from './hooks/useAuth';
-import { ProvidersPage } from './components';
+import { supabase } from './lib/supabase'; // ← Agrega esta importación
 
 const PublicRoute = ({
   children,
@@ -46,7 +47,54 @@ const PublicRoute = ({
   return <>{children}</>;
 };
 
-function App() {
+// 🔍 NUEVO: Componente interno para debugging
+function AppWithDebug() {
+  // 🔍 DEBUGGING 1: Monitorear canales activos
+  useEffect(() => {
+    console.log('🚀 App montada - Iniciando monitoreo de canales');
+    
+    const interval = setInterval(() => {
+      const channels = supabase.getChannels();
+      console.log('📡 Canales activos:', channels.length);
+      
+      if (channels.length > 0) {
+        console.log('📋 Nombres de canales:', channels.map(ch => ch.topic));
+      }
+      
+      // ⚠️ Alerta si hay demasiados canales
+      if (channels.length > 3) {
+        console.warn('⚠️ ADVERTENCIA: Demasiados canales activos!', channels.length);
+      }
+    }, 3000); // Cada 3 segundos
+
+    return () => {
+      console.log('🛑 App desmontada - Deteniendo monitoreo');
+      clearInterval(interval);
+    };
+  }, []);
+
+  // 🔍 DEBUGGING 2: Detectar cambios de pestaña
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      const channels = supabase.getChannels();
+      
+      if (document.hidden) {
+        console.log('👁️ ===== PESTAÑA OCULTA =====');
+        console.log('📡 Canales antes de ocultar:', channels.length);
+      } else {
+        console.log('👁️ ===== PESTAÑA VISIBLE =====');
+        console.log('📡 Canales al volver:', channels.length);
+        console.log('📋 Canales activos:', channels.map(ch => ch.topic));
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
   const router = createBrowserRouter([
     {
       path: '/',
@@ -135,10 +183,16 @@ function App() {
   ]);
 
   return (
+    <div className="h-full w-full">
+      <RouterProvider router={router} />
+    </div>
+  );
+}
+
+function App() {
+  return (
     <AuthProvider>
-      <div className="h-full w-full">
-        <RouterProvider router={router} />
-      </div>
+      <AppWithDebug />
     </AuthProvider>
   );
 }

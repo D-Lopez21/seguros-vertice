@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { ChevronLeftIcon, HomeIcon, LogOutIcon } from '../icons';
+import { ChevronLeftIcon, LogOutIcon } from '../icons';
 import { useSignOut } from '../../hooks/useSignOut';
 
 interface DashboardLayoutProps {
@@ -10,6 +10,298 @@ interface DashboardLayoutProps {
   subtitle?: string;
   returnTo?: string;
 }
+
+const css = `
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+  .dl-root {
+    min-height: 100dvh;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    font-family: 'DM Sans', sans-serif;
+    background: #f1f5f9;
+    position: relative;
+  }
+
+  /* ── Navbar ── */
+  .dl-nav {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 32px;
+    height: 64px;
+    background: #ffffff;
+    border-bottom: 1px solid #e2e8f0;
+    box-shadow: 0 1px 8px rgba(0,0,0,0.05);
+  }
+
+  .dl-nav-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    text-decoration: none;
+  }
+
+  .dl-nav-logo {
+    width: 38px;
+    height: 38px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    border-radius: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 14px rgba(99,102,241,0.28);
+    transition: transform 0.2s, box-shadow 0.2s;
+    flex-shrink: 0;
+  }
+
+  .dl-nav-brand:hover .dl-nav-logo {
+    transform: scale(1.08);
+    box-shadow: 0 6px 20px rgba(99,102,241,0.38);
+  }
+
+  .dl-nav-logo svg {
+    width: 18px;
+    height: 18px;
+    stroke: white;
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .dl-nav-brand-name {
+    font-size: 17px;
+    font-weight: 700;
+    color: #1e293b;
+    letter-spacing: -0.3px;
+  }
+
+  .dl-nav-brand-name span {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .dl-nav-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .dl-nav-user {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 6px 12px 6px 6px;
+  }
+
+  .dl-nav-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: white;
+    flex-shrink: 0;
+  }
+
+  .dl-nav-user-info {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .dl-nav-user-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1e293b;
+    line-height: 1;
+  }
+
+  .dl-nav-user-email {
+    font-size: 11px;
+    color: #94a3b8;
+    margin-top: 2px;
+  }
+
+  .dl-logout-btn {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: 'DM Sans', sans-serif;
+    cursor: pointer;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    color: #64748b;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    white-space: nowrap;
+  }
+
+  .dl-logout-btn:hover {
+    background: #fef2f2;
+    color: #dc2626;
+    border-color: #fecaca;
+  }
+
+  /* ── Main content ── */
+  .dl-main {
+    flex: 1;
+    width: 100%;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 32px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    animation: dl-fadeUp 0.4s cubic-bezier(0.16,1,0.3,1) both;
+  }
+
+  @media (max-width: 768px) {
+    .dl-main { padding: 20px 16px; }
+    .dl-nav { padding: 0 16px; }
+    .dl-nav-user-info { display: none; }
+  }
+
+  /* ── Back button ── */
+  .dl-back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #6366f1;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 8px 14px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    align-self: flex-start;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  }
+
+  .dl-back-btn:hover {
+    background: #f8fafc;
+    border-color: #c7d2fe;
+    color: #4f46e5;
+  }
+
+  .dl-back-btn svg {
+    transition: transform 0.15s;
+  }
+
+  .dl-back-btn:hover svg {
+    transform: translateX(-3px);
+  }
+
+  /* ── Page header card ── */
+  .dl-header-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
+    padding: 24px 28px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .dl-header-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 4px;
+    height: 100%;
+    background: linear-gradient(to bottom, #6366f1, #8b5cf6);
+    border-radius: 4px 0 0 4px;
+  }
+
+  .dl-header-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 26px;
+    color: #0f172a;
+    line-height: 1.2;
+    margin-bottom: 6px;
+  }
+
+  .dl-header-subtitle {
+    font-size: 14px;
+    color: #64748b;
+    line-height: 1.6;
+    max-width: 520px;
+  }
+
+  /* ── Footer ── */
+  .dl-footer {
+    text-align: center;
+    padding: 24px 16px;
+    background: #ffffff;
+    border-top: 1px solid #e2e8f0;
+  }
+
+  .dl-footer p {
+    font-size: 13px;
+    font-weight: 600;
+    color: #475569;
+  }
+
+  .dl-footer span {
+    font-size: 12px;
+    color: #94a3b8;
+    display: block;
+    margin-top: 3px;
+  }
+
+  /* ── Loading ── */
+  .dl-loading {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #f1f5f9;
+    gap: 20px;
+  }
+
+  .dl-spinner {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 3px solid #e2e8f0;
+    border-top-color: #6366f1;
+    animation: dl-spin 0.7s linear infinite;
+  }
+
+  .dl-loading p {
+    font-size: 13px;
+    font-weight: 600;
+    color: #64748b;
+    letter-spacing: 0.5px;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  @keyframes dl-spin    { to { transform: rotate(360deg); } }
+  @keyframes dl-fadeUp  {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+`;
 
 export const DashboardLayout = ({
   children,
@@ -28,15 +320,13 @@ export const DashboardLayout = ({
 
   if (isLoading) {
     return (
-      <div className="flex h-dvh w-full flex-col items-center justify-center bg-gradient-to-br from-blue-50 via-cyan-50 to-sky-50">
-        <div className="relative">
-          <div className="h-16 w-16 rounded-full border-4 border-blue-200 border-t-blue-600 animate-spin"></div>
-          <div className="absolute inset-0 h-16 w-16 rounded-full border-4 border-blue-100 animate-ping"></div>
+      <>
+        <style>{css}</style>
+        <div className="dl-loading">
+          <div className="dl-spinner" />
+          <p>Cargando Panel</p>
         </div>
-        <p className="mt-6 text-sm font-semibold text-slate-700 tracking-wide">
-          Cargando Panel
-        </p>
-      </div>
+      </>
     );
   }
 
@@ -45,133 +335,67 @@ export const DashboardLayout = ({
   const initial = fullName.charAt(0).toUpperCase();
 
   return (
-    <div className="min-h-dvh w-full flex flex-col font-sans relative overflow-hidden">
-      {/* Animated gradient background */}
-      <div className="fixed inset-0 bg-gradient-to-br from-white via-blue-50 to-cyan-50 -z-20">
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iYSIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVHJhbnNmb3JtPSJyb3RhdGUoNDUpIj48cGF0aCBkPSJNLS41IDM5LjVoNDF2MWgtNDF6IiBmaWxsPSJyZ2JhKDU5LDEzMCwyNDYsLjAzKSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNhKSIvPjwvc3ZnPg==')] opacity-50" />
-      </div>
+    <>
+      <style>{css}</style>
+      <div className="dl-root">
 
-      {/* Floating orbs */}
-      <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 left-20 w-72 h-72 bg-blue-200/30 rounded-full blur-3xl animate-float" />
-        <div className="absolute bottom-20 right-20 w-96 h-96 bg-cyan-200/30 rounded-full blur-3xl animate-float-delayed" />
-      </div>
-
-      {/* Glassmorphic Navbar */}
-      <nav className="sticky top-0 z-50 border-b border-blue-200/50 bg-white/80 backdrop-blur-2xl shadow-lg shadow-blue-500/5">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <div
-            className="flex items-center gap-3 cursor-pointer group"
-            onClick={() => navigate('/')}
-          >
-            <div className="bg-gradient-to-br from-blue-500 to-cyan-500 p-2.5 rounded-2xl border border-blue-300/30 group-hover:scale-110 group-hover:shadow-lg group-hover:shadow-blue-500/30 transition-all duration-300">
-              <HomeIcon className="h-5 w-5 text-white" />
+        {/* Navbar */}
+        <nav className="dl-nav">
+          <div className="dl-nav-brand" onClick={() => navigate('/')}>
+            <div className="dl-nav-logo">
+              <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
             </div>
-            <span className="text-xl font-bold text-slate-800 tracking-tight">
-              Admin<span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-cyan-600">Panel</span>
+            <span className="dl-nav-brand-name">
+              Seguros<span>Vértice</span>
             </span>
           </div>
 
-          <div className="flex items-center gap-6">
-            <div className="hidden items-center gap-4 md:flex">
-              <div className="text-right">
-                <p className="text-sm font-bold text-slate-800 leading-none mb-1">
-                  {fullName}
-                </p>
-                <p className="text-xs text-slate-500 font-medium">
-                  {user?.email}
-                </p>
-              </div>
-              <div className="h-11 w-11 rounded-full bg-gradient-to-br from-blue-100 to-cyan-100 border-2 border-blue-300/50 flex items-center justify-center text-blue-700 font-bold shadow-sm">
-                {initial}
+          <div className="dl-nav-right">
+            <div className="dl-nav-user">
+              <div className="dl-nav-avatar">{initial}</div>
+              <div className="dl-nav-user-info">
+                <span className="dl-nav-user-name">{fullName}</span>
+                <span className="dl-nav-user-email">{user?.email}</span>
               </div>
             </div>
 
-            <button
-              onClick={handleLogout}
-              className="bg-white/80 hover:bg-white backdrop-blur-xl border border-slate-200 text-slate-600 hover:text-red-600 px-4 py-2 rounded-xl font-semibold transition-all duration-300 flex items-center gap-2 shadow-sm hover:shadow-md hover:border-red-200"
-            >
-              <LogOutIcon className="h-4 w-4" />
-              <span className="hidden sm:inline">Salir</span>
+            <button className="dl-logout-btn" onClick={handleLogout}>
+              <LogOutIcon style={{ width: 14, height: 14 }} />
+              <span>Salir</span>
             </button>
           </div>
-        </div>
-      </nav>
+        </nav>
 
-      {/* Content Area */}
-      <main className="flex-1 w-full max-w-7xl mx-auto p-6 md:p-8 lg:p-10 animate-fade-in">
-        <div className="flex flex-col gap-10">
-          {/* Header */}
-          <div className="space-y-4">
-            {returnTo && (
-              <button
-                onClick={() => navigate(returnTo)}
-                className="flex items-center text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors group bg-white/80 backdrop-blur-xl border border-blue-200 px-4 py-2 rounded-xl shadow-sm hover:shadow-md"
-              >
-                <ChevronLeftIcon className="h-4 w-4 mr-1.5 transition-transform group-hover:-translate-x-1" />
-                Volver
-              </button>
-            )}
+        {/* Main */}
+        <main className="dl-main">
 
-            {(title || subtitle) && (
-              <header className="bg-white/80 backdrop-blur-2xl border border-blue-200/50 rounded-2xl p-6 shadow-xl shadow-blue-500/5">
-                {title && (
-                  <h1 className="text-2xl md:text-3xl font-bold text-slate-800 tracking-tight mb-2">
-                    {title}
-                  </h1>
-                )}
-                {subtitle && (
-                  <p className="text-sm text-slate-600 max-w-2xl leading-relaxed font-medium">
-                    {subtitle}
-                  </p>
-                )}
-              </header>
-            )}
-          </div>
+          {/* Back button */}
+          {returnTo && (
+            <button className="dl-back-btn" onClick={() => navigate(returnTo)}>
+              <ChevronLeftIcon style={{ width: 14, height: 14 }} />
+              Volver
+            </button>
+          )}
 
-          {/* Content */}
-          <section>{children}</section>
-        </div>
-      </main>
+          {/* Header card */}
+          {(title || subtitle) && (
+            <div className="dl-header-card">
+              {title    && <div className="dl-header-title">{title}</div>}
+              {subtitle && <div className="dl-header-subtitle">{subtitle}</div>}
+            </div>
+          )}
 
-      {/* Footer */}
-      <footer className="py-8 text-center bg-white/80 backdrop-blur-xl border-t border-blue-200/50 shadow-inner">
-        <p className="text-sm text-slate-700 font-semibold">
-          © {new Date().getFullYear()} Diego Lopez
-        </p>
-        <p className="text-xs text-slate-500 mt-1">
-          Panel de Administración · Todos los derechos reservados
-        </p>
-      </footer>
+          {/* Children */}
+          {children}
+        </main>
 
-      <style>{`
-        @keyframes fade-in {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
+        {/* Footer */}
+        <footer className="dl-footer">
+          <p>© {new Date().getFullYear()} Diego Lopez</p>
+          <span>Panel de Administración · Todos los derechos reservados</span>
+        </footer>
 
-        @keyframes float {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          50% { transform: translate(30px, -30px) scale(1.1); }
-        }
-
-        @keyframes float-delayed {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          50% { transform: translate(-30px, 30px) scale(1.1); }
-        }
-
-        .animate-fade-in {
-          animation: fade-in 0.6s ease-out;
-        }
-
-        .animate-float {
-          animation: float 10s ease-in-out infinite;
-        }
-
-        .animate-float-delayed {
-          animation: float-delayed 12s ease-in-out infinite 2s;
-        }
-      `}</style>
-    </div>
+      </div>
+    </>
   );
 };

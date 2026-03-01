@@ -9,12 +9,14 @@ export function useGetAllUsers() {
   const [error, setError] = React.useState<string | null>(null);
 
   const fetchUsers = React.useCallback(async () => {
+    setLoading(true);  // ← Resetear loading antes de cada fetch
+    setError(null);    // ← Limpiar errores anteriores
     try {
       const { data, error: supabaseError } = await supabase
         .from('profile')
         .select('*')
         .neq('role', 'proveedor')
-        .eq('active', true) // 🔥 SOLO OBTENER USUARIOS ACTIVOS
+        .eq('active', true)
         .order('name', { ascending: true });
 
       if (supabaseError) throw supabaseError;
@@ -27,18 +29,15 @@ export function useGetAllUsers() {
     }
   }, []);
 
-  // 🔥 CAMBIO PRINCIPAL: En lugar de borrado físico, hacer borrado lógico
   const deleteUser = async (id: string) => {
     try {
-      // Cambiamos de borrado físico a borrado lógico
       const { error: updateError } = await supabase
         .from('profile')
-        .update({ active: false }) // Marcar como inactivo
+        .update({ active: false })
         .eq('id', id);
-      
+
       if (updateError) throw updateError;
-      
-      // Remover del estado local para que desaparezca de la UI
+
       setUsers((prev) => prev.filter((u) => u.id !== id));
       return true;
     } catch (err: any) {
@@ -68,12 +67,12 @@ export function useGetAllUsers() {
     fetchUsers();
   }, [fetchUsers]);
 
-  return { 
-    users, 
-    loading, 
-    error, 
-    deleteUser, 
-    updateUser, 
-    refetch: fetchUsers 
+  return {
+    users,
+    loading,
+    error,
+    deleteUser,
+    updateUser,
+    refetch: fetchUsers,
   };
 }

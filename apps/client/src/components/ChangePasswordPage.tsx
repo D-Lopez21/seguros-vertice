@@ -43,8 +43,8 @@ export default function ChangePasswordPage() {
           <p className="text-neutral-600 mb-6">
             Tu perfil ha sido desbloqueado correctamente. Ya puedes acceder al sistema.
           </p>
-          <Button onClick={() => window.location.href = '/login'} variant="primary">
-            Ir al Inicio de Sesión
+          <Button onClick={() => window.location.href = '/'} variant="primary">
+            Ir a la pagina principal
           </Button>
         </div>
       </DashboardLayout>
