@@ -134,7 +134,7 @@ const MODULE_CARDS = [
     btnGradient: 'linear-gradient(135deg,#10b981,#059669)',
     route: '/bills',
     adminOnly: false,
-    features: ['Crear y gestionar facturas', 'Filtrar por N° Factura', 'Filtrar por Proveedor o Lote'],
+    features: ['Crear y gestionar facturas', 'Filtrar por N° de Siniestro, Proveedor, Lote o estado', 'Acceder a detalles y auditoría de cada factura'],
   },
 ];
 

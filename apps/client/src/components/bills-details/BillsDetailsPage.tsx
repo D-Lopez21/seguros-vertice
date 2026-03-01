@@ -263,6 +263,27 @@ export default function BillsDetailsPage({
           return;
         }
 
+        // ─── Validación: n_billing único por proveedor ───────────────────────
+        const { data: duplicates, error: dupError } = await supabase
+          .from('bills')
+          .select('id')
+          .eq('n_billing', sectionData?.n_billing)
+          .eq('suppliers_id', sectionData?.suppliers_id)
+          .neq('id', billId ?? '')   // al editar, excluye la propia factura
+          .limit(1);
+
+        if (dupError) throw dupError;
+
+        if (duplicates && duplicates.length > 0) {
+          showModal(
+            `El número de factura "${sectionData?.n_billing}" ya existe para este proveedor.`,
+            'error'
+          );
+          setLoading(false);
+          return;
+        }
+        // ────────────────────────────────────────────────────────────────────
+
         if (isCreating) {
           const { data: newBill, error } = await supabase
             .from('bills')
