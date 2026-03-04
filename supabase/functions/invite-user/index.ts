@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
     );
 
     // URL base del frontend para los enlaces de invitación / recuperación
-    const frontendUrl = Deno.env.get('FRONTEND_URL') ?? 'https://seguros-vertice.onrender.com/';
+    const frontendUrl = Deno.env.get('FRONTEND_URL') ?? 'https://seguros-vertice.onrender.com';
 
     // 1. Verificar si el email ya existe
     const { data: existingUsers, error: listError } = await supabase.auth.admin.listUsers();
