@@ -21,6 +21,7 @@ export default function LiquidationSection({
   isProveedor,
 }: any) {
   const [modalOpen, setModalOpen] = React.useState(false);
+  const [isRetentionManual, setIsRetentionManual] = React.useState(false);
 
   const handleInputChange = (fieldName: string, value: string) => {
     let cleanValue = value;
@@ -36,14 +37,21 @@ export default function LiquidationSection({
   const servicios = parseFloat(data.servicios_clinicos) || 0;
 
   const montoAmp = gna + honorarios + servicios;
-  const retencion = montoFactNum * 0.05;
-  const montoIndemniz = montoAmp - retencion;
+  const defaultRetencion = montoFactNum * 0.05;
+  const retencionActual = isRetentionManual
+    ? (parseFloat(data.retention_rate) || 0)
+    : defaultRetencion;
+  const montoIndemniz = montoAmp - retencionActual;
 
   React.useEffect(() => {
-    if (data.monto_amp !== String(montoAmp) || data.monto_indemniz !== String(montoIndemniz)) {
-      setData({ ...data, monto_amp: String(montoAmp), monto_indemniz: String(montoIndemniz) });
+    const updates: any = {};
+    if (data.monto_amp !== String(montoAmp)) updates.monto_amp = String(montoAmp);
+    if (data.monto_indemniz !== String(montoIndemniz)) updates.monto_indemniz = String(montoIndemniz);
+    if (!isRetentionManual && data.retention_rate !== String(defaultRetencion)) {
+      updates.retention_rate = String(defaultRetencion);
     }
-  }, [montoAmp, montoIndemniz]);
+    if (Object.keys(updates).length > 0) setData({ ...data, ...updates });
+  }, [montoAmp, montoIndemniz, defaultRetencion, isRetentionManual]);
 
   const montosCoinciden = Math.abs(montoAmp - montoFactNum) < 0.01;
 
@@ -71,7 +79,7 @@ export default function LiquidationSection({
         <div className="bg-amber-50 border-l-4 border-amber-400 p-4 shadow-sm rounded-r-lg flex items-center">
           <div className="ml-3">
             <p className="text-sm text-amber-800">
-              Usted está en modo <span className="font-bold">Vista Previa</span>. 
+              Usted está en modo <span className="font-bold">Vista Previa</span>.
               Solo puede editar esta sección el analista que la guardó originalmente o un usuario con rol <span className="font-mono bg-amber-100 px-1 rounded">admin</span>.
             </p>
           </div>
@@ -164,11 +172,49 @@ export default function LiquidationSection({
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('servicios_clinicos', e.target.value)}
               disabled={isReadOnly}
             />
+
+            {/* Retención — editable con opción de restablecer */}
             <div>
-              <label className="block text-sm font-medium text-slate-400 mb-1">Retención 5% (Calculada)</label>
-              <div className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-lg text-slate-500">
-                {retencion.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+              <label className="block text-sm font-medium mb-1 transition-colors
+                  ${isRetentionManual ? 'text-orange-600' : 'text-slate-400'}">
+                Retención {isRetentionManual ? '(Editada)' : '5% (Calculada)'}
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  value={isRetentionManual ? data.retention_rate : retencionActual}
+                  onChange={(e) => {
+                    setIsRetentionManual(true);
+                    handleInputChange('retention_rate', e.target.value);
+                  }}
+                  disabled={isReadOnly}
+                  className={`w-full px-4 py-2.5 rounded-lg border outline-none transition-all
+                    ${isRetentionManual
+                      ? 'bg-orange-50 border-orange-300 text-orange-700 font-semibold pr-24'
+                      : 'bg-slate-50 border-slate-100 text-slate-500'
+                    }
+                    ${isReadOnly ? 'cursor-not-allowed opacity-70' : ''}
+                  `}
+                />
+                {isRetentionManual && !isReadOnly && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsRetentionManual(false);
+                      setData({ ...data, retention_rate: String(defaultRetencion) });
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-orange-500 hover:text-orange-700 font-semibold underline whitespace-nowrap"
+                    title="Restablecer al 5%"
+                  >
+                    Restablecer
+                  </button>
+                )}
               </div>
+              {isRetentionManual && (
+                <p className="text-xs text-orange-500 mt-1">
+                  Valor automático (5%): {defaultRetencion.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                </p>
+              )}
             </div>
           </div>
 

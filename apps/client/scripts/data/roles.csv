@@ -1,0 +1,10 @@
+CARGA MASIVA Ñ ROLES;;;
+id (UUID);name;;
+11e11b1c-e374-40e6-83f7-7fd26e39d7e5;finiquito;;
+585e2b2b-2906-4af0-96cf-911120ff2fa7;recepcion;;
+5d2bcc5f-e8fc-4a7c-8dd3-063c03c02859;pagos;;
+6e91f5d8-a66e-4476-85f0-1c9434af669d;proveedor;;
+8b8abbda-1546-456b-81a8-164960641a11;liquidacion;;
+8c0bb715-806f-4096-ab35-d1b1304aea97;auditoria;;
+cf360db7-77de-4b38-93b8-8d1ab1103978;programacion;;
+da4b221f-cfd4-4892-b4b5-3509df707a60;admin;;
