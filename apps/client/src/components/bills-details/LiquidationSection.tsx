@@ -32,11 +32,10 @@ export default function LiquidationSection({
   };
 
   const montoFactNum = parseFloat(data.monto_fact) || 0;
-  const gna = parseFloat(data.gna) || 0;
   const honorarios = parseFloat(data.honorarios_medic) || 0;
   const servicios = parseFloat(data.servicios_clinicos) || 0;
 
-  const montoAmp = gna + honorarios + servicios;
+  const montoAmp = honorarios + servicios;
   const defaultRetencion = montoFactNum * 0.05;
   const retencionActual = isRetentionManual
     ? (parseFloat(data.retention_rate) || 0)
@@ -135,7 +134,7 @@ export default function LiquidationSection({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Monto AMP (GNA + HM + SC)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Monto AMP (HM + SC)</label>
               <div
                 className={`w-full px-4 py-2.5 rounded-lg border font-bold transition-all
                   ${montosCoinciden
@@ -175,8 +174,11 @@ export default function LiquidationSection({
 
             {/* Retención — editable con opción de restablecer */}
             <div>
-              <label className="block text-sm font-medium mb-1 transition-colors
-                  ${isRetentionManual ? 'text-orange-600' : 'text-slate-400'}">
+              <label
+                className={`block text-sm font-medium mb-1 transition-colors ${
+                  isRetentionManual ? 'text-orange-600' : 'text-slate-400'
+                }`}
+              >
                 Retención {isRetentionManual ? '(Editada)' : '5% (Calculada)'}
               </label>
               <div className="relative">
@@ -187,14 +189,14 @@ export default function LiquidationSection({
                     setIsRetentionManual(true);
                     handleInputChange('retention_rate', e.target.value);
                   }}
-                  disabled={isReadOnly}
-                  className={`w-full px-4 py-2.5 rounded-lg border outline-none transition-all
-                    ${isRetentionManual
+                  readOnly={isReadOnly}
+                  className={`w-full px-4 py-2.5 rounded-lg border outline-none transition-all ${
+                    isReadOnly
+                      ? 'bg-slate-50 border-slate-100 text-slate-500 cursor-not-allowed'
+                      : isRetentionManual
                       ? 'bg-orange-50 border-orange-300 text-orange-700 font-semibold pr-24'
-                      : 'bg-slate-50 border-slate-100 text-slate-500'
-                    }
-                    ${isReadOnly ? 'cursor-not-allowed opacity-70' : ''}
-                  `}
+                      : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 focus:border-blue-400'
+                  }`}
                 />
                 {isRetentionManual && !isReadOnly && (
                   <button
