@@ -34,135 +34,110 @@ function clean(row) {
   );
 }
 
-// ─── 1. Cargar roles ──────────────────────────────────────────────────────────
-
-async function loadRoles() {
-  console.log('\n🔑 Cargando roles...');
-  const roles = readCSV('roles.csv').map(clean);
-
-//   const { error } = await supabase.from('roles').upsert(roles, { onConflict: 'name' });
-//   if (error) {
-//     console.error('  ❌ Error roles:', error.message);
-//     return [];
-//   }
-
-//   // Retorna mapa nombre → id actualizado desde la BD
-  const { data } = await supabase.from('roles').select('id, name');
-  console.log(`  ✅ ${data.length} roles listos`);
-  return Object.fromEntries(data.map(r => [r.name, r.id]));
-}
-
-// ─── 2. Cargar usuarios (auth + profile + user_roles automático) ──────────────
-
-async function loadUsers(roleMap) {
-  console.log('\n👤 Cargando usuarios...');
-  const users = readCSV('profile.csv').map(clean);
-  console.log('users', users)
-
-  // Filtra filas vacías o de notas (sin email)
-  const validUsers = users.filter(u => u.email && u.email.includes('@'));
-
-  console.log(validUsers.length, 'Usuarios validos')
-  let ok = 0, fail = 0;
-
-  for (const user of validUsers) {
-    // 1. Crea en auth.users
-    const { data, error: authError } = await supabase.auth.admin.createUser({
-      email: user.email,
-      password: user.password_temporal ?? 'Cambiar123!',
-      email_confirm: true,
-      user_metadata: { name: user.name, role: user.role }
-    });
-
-    if (authError) {
-  // Si ya existe en auth, búscalo en vez de fallar
-  if (authError.message.includes('already been registered')) {
-    const { data: list } = await supabase.auth.admin.listUsers();
-    const existing = list.users.find(u => u.email === user.email);
-    if (existing) {
-      userId = existing.id; // reutiliza el id existente
-    }
-  } else {
-    console.error(`  ❌ Auth (${user.email}): ${authError.message}`);
-    fail++;
-    continue;
-  }
-}
-
-    const userId = data.user.id;
-
-    // 2. Inserta en public.profile con el mismo id
-    const { error: profileError } = await supabase.from('profile').upsert({
-      id:                       userId,
-      email:                    user.email,
-      name:                     user.name,
-      role:                     null, // el rol se asigna en user_roles, no aquí
-      rif:                      user.rif ?? null,
-      active:                   user.active?.toUpperCase() !== 'FALSE',
-      password_change_required: true
-    });
-
-    if (profileError) {
-      console.error(`  ❌ Profile (${user.email}): ${profileError.message}`);
-      fail++;
-      continue;
-    }
-
-    // 3. Asigna user_roles automáticamente desde la columna "role" del CSV
-    //    Un usuario puede tener varios roles separados por | (ej: "admin|pagos")
-    const roleNames = (user.role ?? '').split(/[|,]/).map(r => r.trim()).filter(Boolean);
-    const userRoleRows = roleNames
-      .map(name => ({ user_id: userId, role_id: roleMap[name] }))
-      .filter(r => {
-        if (!r.role_id) console.warn(`  ⚠️  Rol no encontrado en BD: "${roleNames}" para ${user.email}`);
-        return r.role_id;
-      });
-
-    if (userRoleRows.length > 0) {
-      const { error: roleError } = await supabase.from('user_roles').insert(userRoleRows);
-      if (roleError) {
-        console.error(`  ❌ user_roles (${user.email}): ${roleError.message}`);
-      }
-    }
-
-    console.log(`  ✅ ${user.email} → rol: ${user.role}`);
-    ok++;
-  }
-
-  console.log(`\n  📊 Usuarios: ${ok} exitosos, ${fail} fallidos`);
-}
-
-// ─── 3. Cargar bills ──────────────────────────────────────────────────────────
+// ─── Cargar bills ─────────────────────────────────────────────────────────────
 
 async function loadBills() {
   console.log('\n🧾 Cargando facturas...');
   const bills = readCSV('bills.csv').map(clean);
 
-  // Filtra filas de notas o vacías
   const validBills = bills.filter(b => b.n_claim || b.n_billing);
 
-  // Trae proveedores para mapear rif → id
-  const { data: providers } = await supabase
-    .from('profile')
-    .select('id, rif')
-    .eq('role', 'proveedor');
+  // Convierte string con coma decimal a float (ej: "44,1" → 44.1)
+  const toFloat = (val) => {
+    if (val === null || val === undefined || val === '') return null;
+    return parseFloat(String(val).replace(',', '.'));
+  };
 
-  const rifMap = Object.fromEntries((providers ?? []).map(p => [p.rif, p.id]));
+  const NUMERIC_FIELDS = [
+    'total_billing', 'medical_honoraries', 'clinical_services',
+    'retention_rate', 'indemnizable_rate', 'monto_amp', 'gna',
+    'bs_amount', 'tcr_amount', 'dollar_amount',
+    'vertice_difference', 'provider_difference',
+  ];
 
-  const rows = validBills.map(b => {
-    const { rif_proveedor, notas, ...rest } = b; // elimina columnas auxiliares
-    return {
-      ...rest,
-      suppliers_id: rifMap[rif_proveedor] ?? null,
-      total_billing:       rest.total_billing       ? parseFloat(rest.total_billing)       : null,
-      medical_honoraries:  rest.medical_honoraries  ? parseFloat(rest.medical_honoraries)  : 0,
-      clinical_services:   rest.clinical_services   ? parseFloat(rest.clinical_services)   : 0,
-      indemnizable_rate:   rest.indemnizable_rate   ? parseFloat(rest.indemnizable_rate)   : null,
-      active: rest.active?.toUpperCase() !== 'FALSE'
+  // Valores válidos según los enums de Supabase
+  const VALID_STATES = new Set(['recibida', 'pendiente', 'programado', 'pagado', 'devuelto']);
+  const VALID_CLAIM_TYPES = new Set([
+    'AMBULATORIO', 'APS', 'CARTA AVAL', 'FARMACIA', 'HOSPITALIZACION',
+    'JORNADA', 'LABORATORIO', 'ONCOLOGICO', 'TRASLADO EN AMBULANCIA',
+    'HOME CARE', 'PREGRADO', 'JUNTA MEDICA', 'PREPAGO', 'DEVUELTA',
+  ]);
+
+  // Normaliza tildes (ej: "ONCOLÓGICO" → "ONCOLOGICO")
+  const normalizeClaimType = (val) => {
+    if (!val) return null;
+    const normalized = val.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+    if (VALID_CLAIM_TYPES.has(normalized)) return normalized;
+    console.warn(`  ⚠️  claim_type desconocido omitido: "${val}"`);
+    return null;
+  };
+
+  // Trae los n_control que ya existen en la BD
+  const { data: existing, error: existingError } = await supabase
+    .from('bills')
+    .select('n_control, suppliers_id');
+
+  if (existingError) throw new Error('Error consultando facturas existentes: ' + existingError.message);
+
+  const seen = new Set(
+    (existing ?? []).map(r => `ctrl__${r.n_control}__${r.suppliers_id ?? 'null'}`)
+  ); // pre-cargado con los ya existentes en BD
+
+  const rows = validBills.reduce((acc, b) => {
+    const { rif_proveedor, notas, id, updated_at, ...rest } = b;
+    const row = { ...rest, active: rest.active?.toUpperCase() !== 'FALSE' };
+
+    // Limpia y corrige fechas con años mal escritos (20206, 0206, 20026, 0202, etc.)
+    const DATE_FIELDS = ["arrival_date","severance_date","audit_date","programmed_date","paid_date","settlement_date","updated_at"];
+    const fixDateYear = (val) => {
+      if (!val) return null;
+      let s = String(val).trim();
+      // Caso especial "4/32026"
+      if (/^\d+\/\d+/.test(s)) return null;
+      // Extrae el año (primeros dígitos antes del primer -)
+      s = s
+        .replace(/^20206-/, '2026-')
+        .replace(/^20026-/, '2026-')
+        .replace(/^0206-/,  '2026-')
+        .replace(/^0202-/,  '2026-');
+      const d = new Date(s);
+      return isNaN(d.getTime()) ? null : d.toISOString();
     };
-  });
+    for (const field of DATE_FIELDS) {
+      if (row[field]) row[field] = fixDateYear(row[field]);
+    }
 
-  // Inserta en lotes de 100
+    // Convierte campos numéricos
+    for (const field of NUMERIC_FIELDS) {
+      if (field in row) row[field] = toFloat(row[field]);
+    }
+
+    // Limpia enums
+    row.state      = VALID_STATES.has(row.state) ? row.state : 'recibida'; // fallback para valores inválidos como #N/A
+    row.claim_type = normalizeClaimType(row.claim_type);
+
+    // Mapea variantes de state_sequence al valor correcto del enum
+    const STATE_SEQ_MAP = { liquidado: "liquidacion" };
+    if (row.state_sequence && STATE_SEQ_MAP[row.state_sequence]) {
+      row.state_sequence = STATE_SEQ_MAP[row.state_sequence];
+    }
+
+    // Omite duplicados — clave: n_control + suppliers_id (con fallback a n_billing)
+    const key = row.n_control
+      ? `ctrl__${row.n_control}__${row.suppliers_id ?? 'null'}`
+      : row.n_billing ? `bill__${row.n_billing}__${row.suppliers_id ?? 'null'}` : null;
+    if (key && seen.has(key)) {
+      console.warn(`  ⚠️  Duplicado omitido: n_control="${row.n_control}"`);
+      return acc;
+    }
+    if (key) seen.add(key);
+
+    acc.push(row);
+    return acc;
+  }, []);
+
+  console.log(`  📋 ${rows.length} facturas a insertar (de ${validBills.length} en el CSV)\n`);
+
   let ok = 0;
   for (let i = 0; i < rows.length; i += 100) {
     const batch = rows.slice(i, i + 100);
@@ -174,17 +149,16 @@ async function loadBills() {
       console.log(`  ✅ Facturas ${i + 1}–${i + batch.length}`);
     }
   }
-  console.log(`\n  📊 Facturas: ${ok} insertadas de ${rows.length}`);
+  console.log(`\n  📊 Resultado: ${ok} insertadas de ${rows.length}`);
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
-  console.log('🚀 Iniciando carga masiva...');
+  console.log('🚀 Iniciando carga de facturas...');
   console.log(`   URL: ${supabaseUrl}\n`);
 
-  const roleMap = await loadRoles();
-  await loadUsers(roleMap);
+  await loadBills();
 
   console.log('\n🎉 Carga completada');
 }
