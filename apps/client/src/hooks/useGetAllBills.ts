@@ -15,6 +15,24 @@ interface Provider {
 let cachedBills: Bill[] = [];
 let cachedProviders: Provider[] = [];
 
+// Función auxiliar para traer TODOS los registros sin límite de 1000
+async function fetchAllRows<T>(query: any): Promise<T[]> {
+  const batchSize = 1000;
+  let from = 0;
+  let all: T[] = [];
+
+  while (true) {
+    const { data, error } = await query.range(from, from + batchSize - 1);
+    if (error) throw error;
+    all = [...all, ...(data || [])];
+    console.log(`📦 Lote recibido: ${data?.length ?? 0} registros (total acumulado: ${all.length})`);
+    if ((data?.length ?? 0) < batchSize) break;
+    from += batchSize;
+  }
+
+  return all;
+}
+
 export function useGetAllBills() {
   const { user } = useAuth();
   
@@ -51,10 +69,12 @@ export function useGetAllBills() {
         console.log('🔓 Sin filtro - Mostrando todas las facturas');
       }
       query = query.order('arrival_date', { ascending: false });
-      const { data, error: sbError } = await query;
-      if (sbError) throw sbError;
-      cachedBills = data || [];
+
+      // ✅ Usa fetchAllRows para superar el límite de 1000 filas de Supabase
+      const data = await fetchAllRows<Bill>(query);
+      cachedBills = data;
       setBills(cachedBills);
+      console.log(`✅ Refetch completado: ${cachedBills.length} facturas`);
     } catch (err: any) {
       console.error("❌ Error en refetch:", err.message);
       setError(err.message);
@@ -79,19 +99,19 @@ export function useGetAllBills() {
         }
         billsQuery = billsQuery.order('arrival_date', { ascending: false });
 
-        const [bRes, pRes] = await Promise.all([
-          billsQuery,
+        // ✅ Usa fetchAllRows para superar el límite de 1000 filas de Supabase
+        const [billsData, pRes] = await Promise.all([
+          fetchAllRows<Bill>(billsQuery),
           supabase
             .from('profile')
             .select('id, name, rif, active, user_roles(roles(name))')
             .eq('active', true),
         ]);
 
-        if (bRes.error) throw bRes.error;
         if (pRes.error) throw pRes.error;
 
         if (isMounted) {
-          cachedBills = bRes.data || [];
+          cachedBills = billsData;
 
           const mappedProviders: Provider[] = (pRes.data || [])
             .map((row: any) => {
@@ -182,6 +202,5 @@ export function useGetAllBills() {
     return p ? `${p.name}${p.rif ? ` - ${p.rif}` : ''}` : 'Proveedor no encontrado';
   }, [providers]);
 
-  // ✅ providers incluido en el return para que BillsDetailsPage lo use en ReceptionSection
   return { bills, providers, loading, error, getProviderName, deleteBill, refetch };
 }
