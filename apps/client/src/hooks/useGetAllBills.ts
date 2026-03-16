@@ -50,7 +50,6 @@ export function useGetAllBills() {
       const roles = user?.profile?.roles ?? [];
       const isProveedor = roles.includes('proveedor');
 
-      // Si es proveedor, filtrar por suppliers_id vinculado
       if (isProveedor && user) {
         const providerIdentifier = user.profile?.suppliers_id || user.id;
         console.log('🔒 FILTRO APLICADO - Proveedor ID:', providerIdentifier);
@@ -122,9 +121,7 @@ export function useGetAllBills() {
         if (isMounted) {
           cachedBills = bRes.data || [];
 
-          // Mapear perfiles a proveedores reales (rol 'proveedor')
           const mappedProviders: Provider[] = (pRes.data || [])
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .map((row: any) => {
               const roles: string[] =
                 row.user_roles?.map((ur: any) => ur.roles?.name).filter(Boolean) ?? [];
@@ -242,10 +239,13 @@ export function useGetAllBills() {
     }
   }, []);
 
+  // ✅ CAMBIO: si los proveedores ya cargaron pero no se encuentra el ID,
+  // muestra "Proveedor no encontrado" en lugar de quedarse en "Cargando..."
   const getProviderName = React.useCallback((id?: string) => {
     if (!id) return 'Sin proveedor';
+    if (providers.length === 0) return 'Cargando...';
     const p = providers.find(p => p.id === id);
-    return p ? `${p.name}${p.rif ? ` - ${p.rif}` : ''}` : 'Cargando...';
+    return p ? `${p.name}${p.rif ? ` - ${p.rif}` : ''}` : 'Proveedor no encontrado';
   }, [providers]);
 
   return { bills, loading, error, getProviderName, deleteBill, refetch };
