@@ -134,7 +134,7 @@ export function useGetAllBills() {
                 active: row.active,
               };
             })
-            .filter((p: Provider) => p.role === 'proveedor');
+            
 
           cachedProviders = mappedProviders;
 
