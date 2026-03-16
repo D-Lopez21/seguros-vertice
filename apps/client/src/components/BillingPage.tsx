@@ -11,8 +11,10 @@ type FilterType = 'claim' | 'provider' | 'lot' | 'state_sequence';
 export default function BillingPage() {
   const navigate = useNavigate();
   const { user, isAdmin } = useAuth();
-  const { bills, loading, error, getProviderName, deleteBill } = useGetAllBills();
-  
+
+  // ✅ getProviderName y providers vienen de la misma fuente
+  const { bills, loading, error, deleteBill, getProviderName } = useGetAllBills();
+
   const [searchTerm, setSearchTerm] = React.useState('');
   const [filterType, setFilterType] = React.useState<FilterType>('claim');
 
@@ -20,15 +22,14 @@ export default function BillingPage() {
   const isProvider = roles.includes('proveedor');
   const canCreateBill = !isProvider && (isAdmin || roles.includes('recepcion'));
 
-  // Valores técnicos coinciden con lo que guardas en BillsDetailsPage
   const states = [
-    { label: 'Recepción', value: 'recepcion' },
-    { label: 'Liquidación', value: 'liquidacion' },
-    { label: 'Auditoría', value: 'auditoria' },
+    { label: 'Recepción',    value: 'recepcion' },
+    { label: 'Liquidación',  value: 'liquidacion' },
+    { label: 'Auditoría',    value: 'auditoria' },
     { label: 'Programación', value: 'programacion' },
-    { label: 'Pagos', value: 'pagos' },
-    { label: 'Finiquito', value: 'finiquito' },
-    { label: 'Devuelto', value: 'devuelto' },
+    { label: 'Pagos',        value: 'pagos' },
+    { label: 'Finiquito',    value: 'finiquito' },
+    { label: 'Devuelto',     value: 'devuelto' },
   ];
 
   const handleClearFilters = () => {
@@ -44,8 +45,8 @@ export default function BillingPage() {
           <select 
             value={filterType}
             onChange={(e) => {
-                setFilterType(e.target.value as FilterType);
-                setSearchTerm(''); 
+              setFilterType(e.target.value as FilterType);
+              setSearchTerm(''); 
             }}
             className="bg-transparent text-sm font-medium px-3 outline-none border-r border-neutral-200 cursor-pointer text-neutral-600 h-9"
           >
@@ -102,7 +103,7 @@ export default function BillingPage() {
         filterType={filterType} 
         getProviderName={getProviderName}
         onDelete={(id) => {
-            if (window.confirm('¿Eliminar esta factura?')) deleteBill(id);
+          if (window.confirm('¿Eliminar esta factura?')) deleteBill(id);
         }}
       />
     </DashboardLayout>

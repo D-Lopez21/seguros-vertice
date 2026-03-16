@@ -14,7 +14,7 @@ import type {
   SectionId,
 } from './interfaces';
 import { useGetAllUsers } from '../../hooks/useGetAllUsers';
-import { useGetAllProviders } from '../../hooks/useGetAllProviders';
+import { useGetAllBills } from '../../hooks/useGetAllBills'; // ✅ AGREGADO
 import { useAuth } from '../../hooks/useAuth';
 import FinishSection from './FinishSection';
 import PaymentSection from './PaymentSection';
@@ -35,9 +35,9 @@ export default function BillsDetailsPage({
 }) {
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = React.useState<SectionId>('recepcion');
-  const { providers } = useGetAllProviders();
   const { users: allUsers } = useGetAllUsers();
   const { user, isAdmin } = useAuth();
+  const { providers } = useGetAllBills(); // ✅ AGREGADO — misma fuente que BillingPage
 
   const roles = user?.profile?.roles ?? [];
   const isProveedor = roles.includes('proveedor');
@@ -55,7 +55,6 @@ export default function BillsDetailsPage({
     setModalOpen(true);
   };
 
-  // --- ESTADOS DE SECCIONES ---
   const [recepcionData, setRecepcionData] = React.useState<RecepcionData>({
     arrival_date: '',
     suppliers_id: '',
@@ -115,13 +114,11 @@ export default function BillsDetailsPage({
 
     const isCreating = !billId || billId === 'create-bill';
 
-    // En facturas devueltas solo admin puede tocar PROGRAMACION
     if (currentBill?.state === 'devuelto') {
       if (isAdmin && section === 'programacion') return true;
       return false;
     }
 
-    // Admin puede editar siempre (salvo la regla anterior)
     if (isAdmin) return true;
 
     const sectionRoleMap: Record<SectionId, string[]> = {
@@ -136,12 +133,7 @@ export default function BillsDetailsPage({
     const hasRoleForSection = allowedRoles.some((r) => roles.includes(r));
     if (!hasRoleForSection) return false;
 
-    // Regla de propiedad: solo quien guardó la sección puede editarla después
-    // (más admin, ya manejado arriba)
-    if (isCreating || !currentBill || !currentUserId) {
-      // En creación solo validamos rol; todavía no hay propietario.
-      return true;
-    }
+    if (isCreating || !currentBill || !currentUserId) return true;
 
     const ownerFieldMap: Record<SectionId, keyof Bill | null> = {
       recepcion: 'analyst_receptor_id',
@@ -157,11 +149,7 @@ export default function BillsDetailsPage({
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const ownerId = (currentBill as any)[ownerField] as string | null | undefined;
-
-    // Si no hay aún propietario almacenado, permitimos editar a quien tiene el rol.
     if (!ownerId) return true;
-
-    // Solo el dueño de la sección puede editarla posteriormente.
     return ownerId === currentUserId;
   };
 
@@ -169,26 +157,11 @@ export default function BillsDetailsPage({
     if (!currentBill) return { valid: true, message: '' };
     const validations: Record<string, { valid: boolean; message: string }> = {
       recepcion: { valid: true, message: '' },
-      liquidacion: {
-        valid: !!currentBill.analyst_receptor_id,
-        message: 'Debes completar primero la sección de RECEPCIÓN.'
-      },
-      auditoria: {
-        valid: !!currentBill.analyst_severance,
-        message: 'Debes completar primero la sección de LIQUIDACIÓN.'
-      },
-      programacion: {
-        valid: !!currentBill.auditor,
-        message: 'Debes completar primero la sección de AUDITORÍA.'
-      },
-      ejecucion: {
-        valid: !!currentBill.analyst_schedule,
-        message: 'Debes completar primero la sección de PROGRAMACIÓN.'
-      },
-      finiquito: {
-        valid: !!currentBill.analyst_paid,
-        message: 'Debes completar primero la sección de EJECUCIÓN.'
-      }
+      liquidacion: { valid: !!currentBill.analyst_receptor_id, message: 'Debes completar primero la sección de RECEPCIÓN.' },
+      auditoria: { valid: !!currentBill.analyst_severance, message: 'Debes completar primero la sección de LIQUIDACIÓN.' },
+      programacion: { valid: !!currentBill.auditor, message: 'Debes completar primero la sección de AUDITORÍA.' },
+      ejecucion: { valid: !!currentBill.analyst_schedule, message: 'Debes completar primero la sección de PROGRAMACIÓN.' },
+      finiquito: { valid: !!currentBill.analyst_paid, message: 'Debes completar primero la sección de EJECUCIÓN.' },
     };
     return validations[section] || { valid: true, message: '' };
   };
@@ -212,7 +185,6 @@ export default function BillsDetailsPage({
           total_billing: data.total_billing || '',
           analyst_receptor_id: data.analyst_receptor_id || '',
         });
-
         setLiquidacionData({
           fecha_liquidacion: data.severance_date ? formatDateForInput(data.severance_date) : '',
           tipo_siniestro: data.claim_type || '',
@@ -226,18 +198,15 @@ export default function BillsDetailsPage({
           nomenclature_pile: data.nomenclature_pile || '',
           analyst_liquidador: data.analyst_severance || '',
         });
-
         setAuditoriaData({
           fecha_auditoria: data.audit_date ? formatDateForInput(data.audit_date) : '',
           auditor: data.auditor || '',
         });
-
         setProgramacionData({
           fecha_programacion: data.programmed_date ? formatDateForInput(data.programmed_date) : '',
           decision_adm: data.admin_decision || '',
           analyst_programador: data.analyst_schedule || '',
         });
-
         setEjecucionData({
           fecha_pago: data.paid_date ? formatDateForInput(data.paid_date) : '',
           monto_bs: data.bs_amount != null ? String(data.bs_amount) : '',
@@ -248,7 +217,6 @@ export default function BillsDetailsPage({
           diferencia_proveedor: data.provider_difference != null ? String(data.provider_difference) : '',
           analyst_pagador: data.analyst_paid || '',
         });
-
         setFiniquitoData({
           fecha_envio: data.settlement_date ? formatDateForInput(data.settlement_date) : '',
           analyst_finiquito: data.analyst_settlement || '',
@@ -287,31 +255,24 @@ export default function BillsDetailsPage({
           return;
         }
 
-        // ─── Validación: n_billing único por proveedor ───────────────────────
         let dupQuery = supabase
           .from('bills')
           .select('id')
           .eq('n_billing', sectionData?.n_billing)
           .eq('suppliers_id', sectionData?.suppliers_id);
 
-        // Al editar, excluimos la propia factura; en creación no aplicamos este filtro
         if (!isCreating && billId) {
           dupQuery = dupQuery.neq('id', billId);
         }
 
         const { data: duplicates, error: dupError } = await dupQuery.limit(1);
-
         if (dupError) throw dupError;
 
         if (duplicates && duplicates.length > 0) {
-          showModal(
-            `El número de factura "${sectionData?.n_billing}" ya existe para este proveedor.`,
-            'error'
-          );
+          showModal(`El número de factura "${sectionData?.n_billing}" ya existe para este proveedor.`, 'error');
           setLoading(false);
           return;
         }
-        // ────────────────────────────────────────────────────────────────────
 
         if (isCreating) {
           const { data: newBill, error } = await supabase
@@ -365,7 +326,6 @@ export default function BillsDetailsPage({
             gna: parseFloat(sectionData?.gna) || 0,
             medical_honoraries: parseFloat(sectionData?.honorarios_medic) || 0,
             clinical_services: parseFloat(sectionData?.servicios_clinicos) || 0,
-            // ✅ retention_rate ahora se guarda con el valor editado o calculado
             retention_rate: parseFloat(sectionData?.retention_rate) || 0,
             indemnizable_rate: parseFloat(sectionData?.monto_indemniz) || 0,
             nomenclature_pile: sectionData?.nomenclature_pile || null,
@@ -438,12 +398,10 @@ export default function BillsDetailsPage({
 
   const billExists = !!billId && billId !== 'create-bill';
 
-  // ── Título dinámico según rol ──────────────────────────────────────────────
   const pageTitle = isProveedor
     ? 'Factura'
     : billExists ? 'Editar Factura' : 'Nueva Factura';
 
-  // Si un proveedor intenta acceder a la ruta de creación, lo redirigimos a la lista
   React.useEffect(() => {
     if (isProveedor && !billExists) {
       navigate('/bills', { replace: true });
@@ -466,7 +424,7 @@ export default function BillsDetailsPage({
           <ReceptionSection
             data={recepcionData}
             setData={setRecepcionData}
-            providers={providers}
+            providers={providers} // ✅ viene de useGetAllBills, misma fuente
             allUsers={allUsers}
             onSave={(sectionData: any) => handleSaveSection('recepcion', sectionData)}
             isNewBill={!billExists}
