@@ -36,7 +36,7 @@ export default function LiquidationSection({
   const servicios = parseFloat(data.servicios_clinicos) || 0;
 
   const montoAmp = honorarios + servicios;
-  const defaultRetencion = montoFactNum * 0.05;
+  const defaultRetencion = servicios * 0.05; // ✅ CAMBIADO: ahora es 5% de Servicios Clínicos
   const retencionActual = isRetentionManual
     ? (parseFloat(data.retention_rate) || 0)
     : defaultRetencion;
@@ -179,7 +179,7 @@ export default function LiquidationSection({
                   isRetentionManual ? 'text-orange-600' : 'text-slate-400'
                 }`}
               >
-                Retención {isRetentionManual ? '(Editada)' : '5% (Calculada)'}
+                Retención {isRetentionManual ? '(Editada)' : '5% SC (Calculada)'}
               </label>
               <div className="relative">
                 <input
@@ -206,7 +206,7 @@ export default function LiquidationSection({
                       setData({ ...data, retention_rate: String(defaultRetencion) });
                     }}
                     className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-orange-500 hover:text-orange-700 font-semibold underline whitespace-nowrap"
-                    title="Restablecer al 5%"
+                    title="Restablecer al 5% de Servicios Clínicos"
                   >
                     Restablecer
                   </button>
@@ -214,7 +214,7 @@ export default function LiquidationSection({
               </div>
               {isRetentionManual && (
                 <p className="text-xs text-orange-500 mt-1">
-                  Valor automático (5%): {defaultRetencion.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                  Valor automático (5% SC): {defaultRetencion.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
                 </p>
               )}
             </div>
