@@ -9,3 +9,4 @@ export { default as CreateBillPage } from './CreateBills';
 export { default as BillDetailsPage } from './BillsDetailsPage';
 export { default as BillsPage } from './Bills';
 export { default as ProvidersPage } from './Providers';
+export { default as Export } from './Export';

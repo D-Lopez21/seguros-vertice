@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button, DashboardLayout } from './common';
-import { PlusIcon } from './icons';
+import { PlusIcon, DownloadIcon } from './icons';
 import BillsTable from './BillsTable';
 import { useNavigate } from 'react-router';
 import { useGetAllBills } from '../hooks/useGetAllBills';
@@ -12,7 +12,6 @@ export default function BillingPage() {
   const navigate = useNavigate();
   const { user, isAdmin } = useAuth();
 
-  // ✅ getProviderName y providers vienen de la misma fuente
   const { bills, loading, error, deleteBill, getProviderName } = useGetAllBills();
 
   const [searchTerm, setSearchTerm] = React.useState('');
@@ -41,6 +40,7 @@ export default function BillingPage() {
     <DashboardLayout title="Sistema Administrativo Vertice" returnTo="/">
       <div className="w-full flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
         
+        {/* Barra de búsqueda/filtro */}
         <div className="flex bg-white border border-neutral-200 rounded-lg p-1 shadow-sm w-full md:w-auto items-center">
           <select 
             value={filterType}
@@ -82,16 +82,31 @@ export default function BillingPage() {
           )}
         </div>
 
+        {/* Botones de acción */}
         {!isProvider && (
-          <Button
-            icon={<PlusIcon className="size-5" />}
-            onClick={() => canCreateBill && navigate('create-bill')}
-            disabled={!canCreateBill}
-            className={!canCreateBill ? 'opacity-50 cursor-not-allowed' : undefined}
-            title={!canCreateBill ? 'Solo usuarios de Recepción o Admin pueden crear facturas' : undefined}
-          >
-            Nueva Factura
-          </Button>
+          <div className="flex items-center gap-2">
+
+            {/* Botón Exportar — verde esmeralda */}
+            <button
+              onClick={() => navigate('export')}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white text-sm font-semibold shadow-sm transition-colors"
+            >
+              <DownloadIcon className="size-4" />
+              Exportar facturas
+            </button>
+
+            {/* Botón Nueva Factura — azul */}
+            <Button
+              icon={<PlusIcon className="size-5" />}
+              onClick={() => canCreateBill && navigate('create-bill')}
+              disabled={!canCreateBill}
+              className={!canCreateBill ? 'opacity-50 cursor-not-allowed' : undefined}
+              title={!canCreateBill ? 'Solo usuarios de Recepción o Admin pueden crear facturas' : undefined}
+            >
+              Nueva Factura
+            </Button>
+
+          </div>
         )}
       </div>
 
