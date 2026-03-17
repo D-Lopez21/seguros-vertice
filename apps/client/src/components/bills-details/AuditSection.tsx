@@ -9,9 +9,9 @@ export default function AuditSection({
   loading,
   allUsers,
   canEdit,
-  userRole,
   billState,
   currentBill,
+  isProveedor,
 }: any) {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMessage, setModalMessage] = useState('');
@@ -58,11 +58,12 @@ export default function AuditSection({
         }}
         className="space-y-6"
       >
-        {isReadOnly && !isDevuelto && (
+        {isReadOnly && !isDevuelto && !isProveedor && (
           <div className="bg-amber-50 border-l-4 border-amber-400 p-4 shadow-sm rounded-r-lg flex items-center">
             <div className="ml-3">
               <p className="text-sm text-amber-800">
-                Usted está en modo <span className="font-bold">Vista Previa</span>. Su rol actual (<span className="font-mono bg-amber-100 px-1 rounded">{userRole}</span>) no permite editar esta sección.
+                Usted está en modo <span className="font-bold">Vista Previa</span>. 
+                Solo puede editar esta sección el analista que la guardó originalmente o un usuario con rol <span className="font-mono bg-amber-100 px-1 rounded">admin</span>.
               </p>
             </div>
           </div>

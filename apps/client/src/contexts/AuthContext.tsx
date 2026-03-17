@@ -7,7 +7,7 @@ export interface Profile {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'recepcion' | 'liquidacion' | 'auditoria' | 'programacion' | 'pagos' | 'finiquito' | 'proveedor' | 'user';
+  roles: string[]; // ← ahora es un array de roles
   rif: string | null;
   suppliers_id: string | null;
   password_change_required: boolean;
@@ -48,9 +48,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const fetchProfile = React.useCallback(async (currentUser: User): Promise<AuthUser> => {
     try {
+      // Traemos el perfil junto con sus roles relacionados
       const { data, error } = await supabase
         .from('profile')
-        .select('*')
+        .select('*, user_roles(roles(name))')
         .eq('id', currentUser.id)
         .single();
 
@@ -59,7 +60,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return currentUser;
       }
 
-      return { ...currentUser, profile: data as Profile };
+      // Aplanamos los roles a un array de strings: ['admin', 'recepcion', ...]
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const roles: string[] = data.user_roles?.map((ur: any) => ur.roles?.name).filter(Boolean) ?? [];
+
+      const profile: Profile = {
+        id: data.id,
+        name: data.name,
+        email: data.email,
+        roles,
+        rif: data.rif,
+        suppliers_id: data.suppliers_id,
+        password_change_required: data.password_change_required,
+        active: data.active,
+      };
+
+      return { ...currentUser, profile };
     } catch (e) {
       console.error('Error cargando perfil:', e);
       return currentUser;
@@ -109,13 +125,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const validateUserSession = React.useCallback(async (currentUserId: string): Promise<boolean> => {
     const storedUserId = localStorage.getItem('current_user_id');
+    const isResetPasswordRoute = window.location.pathname === '/reset-password';
+
+    // Caso especial: flujo de recuperación / invitación.
+    // Permitimos cambiar de usuario sin forzar redirección al sign-in.
+    if (isResetPasswordRoute && storedUserId && storedUserId !== currentUserId) {
+      console.warn('ℹ️ Cambio de usuario permitido en /reset-password');
+      localStorage.clear();
+      sessionStorage.clear();
+      localStorage.setItem('current_user_id', currentUserId);
+      return true;
+    }
 
     if (storedUserId && storedUserId !== currentUserId) {
       console.warn('⚠️ Detectado cambio de usuario. Cerrando sesión...');
       localStorage.clear();
       sessionStorage.clear();
       await supabase.auth.signOut();
-      window.location.href = '/login';
+      window.location.href = '/sign-in';
       return false;
     }
 
@@ -203,7 +230,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [sendHeartbeat, initializeAuth]);
 
   React.useEffect(() => {
-    // ✅ Limpiar el control al cerrar o recargar la página
     const handleBeforeUnload = () => {
       const activeTabId = localStorage.getItem(ACTIVE_TAB_KEY);
       if (activeTabId === TAB_ID) {
@@ -355,8 +381,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         user,
         session,
         isLoading,
+        // isAdmin es true si el array de roles incluye 'admin'
         isAdmin:
-          user?.profile?.role === 'admin' ||
+          user?.profile?.roles?.includes('admin') ||
           user?.user_metadata?.role === 'admin',
       }}
     >

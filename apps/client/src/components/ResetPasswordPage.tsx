@@ -51,10 +51,21 @@ export default function ResetPassword() {
           setValidatingToken(false);
         }
       } catch (err: any) {
-        if (isMounted) {
-          setError(err.message || 'Error al validar la sesión');
+        if (!isMounted) return;
+
+        // AbortError suele ocurrir cuando la petición se cancela por el navegador.
+        const isAbort =
+          err?.name === 'AbortError' ||
+          typeof err?.message === 'string' && err.message.toLowerCase().includes('aborted');
+
+        if (isAbort) {
+          console.log('ℹ️ Validación de sesión abortada (AbortError controlado en reset-password)');
           setValidatingToken(false);
+          return;
         }
+
+        setError(err?.message || 'Error al validar la sesión');
+        setValidatingToken(false);
       }
     };
 
@@ -138,8 +149,19 @@ export default function ResetPassword() {
         }
         // Si es exitoso, el onAuthStateChange manejará la redirección
       }).catch((err) => {
+        // AbortError suele ocurrir cuando la petición se cancela al cambiar de página o pestaña.
+        const isAbort =
+          err?.name === 'AbortError' ||
+          typeof err?.message === 'string' && err.message.toLowerCase().includes('aborted');
+
+        if (isAbort) {
+          console.log('ℹ️ Petición de updateUser abortada (AbortError controlado)', err);
+          setLoading(false);
+          return;
+        }
+
         console.error('❌ Error en updateUser:', err);
-        setError(err.message || 'Error al actualizar la contraseña');
+        setError(err?.message || 'Error al actualizar la contraseña');
         setLoading(false);
       });
       

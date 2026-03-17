@@ -9,20 +9,30 @@ export function useGetAllUsers() {
   const [error, setError] = React.useState<string | null>(null);
 
   const fetchUsers = React.useCallback(async () => {
-    setLoading(true);  // ← Resetear loading antes de cada fetch
-    setError(null);    // ← Limpiar errores anteriores
+    setLoading(true);
+    setError(null);
     try {
+      // Traer perfil junto con sus roles relacionados
       const { data, error: supabaseError } = await supabase
         .from('profile')
-        .select('*')
-        .neq('role', 'proveedor')
+        .select('*, user_roles(roles(name))')
         .eq('active', true)
         .order('name', { ascending: true });
 
       if (supabaseError) throw supabaseError;
-      setUsers(data || []);
+
+      // Transformar los datos para aplanar los roles a string[]
+      // y filtrar proveedores
+      const profiles: Profile[] = (data || [])
+        .map((item: any) => {
+          const roles: string[] = item.user_roles?.map((ur: any) => ur.roles?.name).filter(Boolean) ?? [];
+          return { ...item, roles };
+        })
+        .filter((item: Profile) => !item.roles.includes('proveedor'));
+
+      setUsers(profiles);
     } catch (err: any) {
-      console.error("Error en useGetAllUsers:", err.message);
+      console.error('Error en useGetAllUsers:', err.message);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -46,16 +56,46 @@ export function useGetAllUsers() {
     }
   };
 
-  const updateUser = async (id: string, updates: Partial<Profile>) => {
+  const updateUser = async (id: string, updates: any) => {
     try {
+      const { roles, ...profileUpdates } = updates;
+
+      // 1. Actualizar datos del perfil
       const { error: updateError } = await supabase
         .from('profile')
-        .update(updates)
+        .update(profileUpdates)
         .eq('id', id);
 
       if (updateError) throw updateError;
 
-      setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, ...updates } : u)));
+      // 2. Si vienen roles, actualizar user_roles
+      if (roles && Array.isArray(roles)) {
+        // Borrar roles actuales
+        const { error: deleteError } = await supabase
+          .from('user_roles')
+          .delete()
+          .eq('user_id', id);
+
+        if (deleteError) throw deleteError;
+
+        // Insertar nuevos roles
+        const { data: roleData, error: roleError } = await supabase
+          .from('roles')
+          .select('id, name')
+          .in('name', roles);
+
+        if (roleError) throw roleError;
+
+        if (roleData && roleData.length > 0) {
+          const { error: insertError } = await supabase
+            .from('user_roles')
+            .insert(roleData.map((r: any) => ({ user_id: id, role_id: r.id })));
+
+          if (insertError) throw insertError;
+        }
+      }
+
+      setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, ...profileUpdates, roles: roles ?? u.roles } : u)));
       return true;
     } catch (err: any) {
       alert('Error al actualizar usuario: ' + err.message);

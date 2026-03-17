@@ -12,18 +12,35 @@ export function useGetAllProviders() {
     try {
       setLoading(true);
       setError(null);
-      
+      // Traemos el perfil junto con sus roles relacionados
       const { data, error: supabaseError } = await supabase
         .from('profile')
-        .select('*')
-        .eq('role', 'proveedor')
-        .eq('active', true) // 🔥 FILTRO: Solo activos
+        .select('*, user_roles(roles(name))')
+        .eq('active', true) // Solo activos
         .order('name', { ascending: true });
 
       if (supabaseError) throw supabaseError;
 
       if (isMounted) {
-        setProviders(data || []);
+        // Mapeamos a Profile e incluimos solo los que tengan rol 'proveedor'
+        const mapped: Profile[] = (data || []).map((row: any) => {
+          const roles: string[] =
+            row.user_roles?.map((ur: any) => ur.roles?.name).filter(Boolean) ?? [];
+
+          return {
+            id: row.id,
+            name: row.name,
+            email: row.email,
+            roles,
+            rif: row.rif,
+            suppliers_id: row.suppliers_id,
+            password_change_required: row.password_change_required,
+            active: row.active,
+          };
+        });
+
+        const onlyProviders = mapped.filter((p) => p.roles?.includes('proveedor'));
+        setProviders(onlyProviders);
       }
     } catch (err: any) {
       console.error('❌ Error en fetchProviders:', err.message);

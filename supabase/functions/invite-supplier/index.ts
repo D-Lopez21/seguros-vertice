@@ -89,15 +89,19 @@ Deno.serve(async (req) => {
       );
     }
 
-    // URL de redirección
-    const redirectUrl = Deno.env.get("SITE_URL") 
-      ? `${Deno.env.get("SITE_URL")}/reset-password`
-      : "https://seguros-vertice.onrender.com/reset-password";
+    // URL de redirección (misma lógica que usuarios)
+    const frontendUrl =
+      Deno.env.get("FRONTEND_URL") ??
+      (Deno.env.get("SITE_URL")
+        ? `${Deno.env.get("SITE_URL")}`
+        : "https://seguros-vertice.onrender.com");
+
+    const redirectUrl = `${frontendUrl}/reset-password`;
 
     // Metadata para proveedor
     const userMetadata = {
       name: fullName,
-      role: "proveedor", // Forzar rol de proveedor
+      role: "proveedor", // redundante, pero se mantiene en user_metadata
       rif: rif,
     };
 
@@ -116,7 +120,8 @@ Deno.serve(async (req) => {
       throw new Error("Error al crear el usuario en Auth");
     }
 
-    console.log("✅ Proveedor creado en Auth:", authData.user.id);
+    const userId = authData.user.id;
+    console.log("✅ Proveedor creado en Auth:", userId);
 
     // Esperar que el trigger cree el perfil
     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -125,7 +130,7 @@ Deno.serve(async (req) => {
     const { data: profile, error: profileCheckError } = await supabaseAdmin
       .from("profile")
       .select("*")
-      .eq("id", authData.user.id)
+      .eq("id", userId)
       .single();
 
     if (profileCheckError || !profile) {
@@ -134,6 +139,39 @@ Deno.serve(async (req) => {
     }
 
     console.log("✅ Perfil de proveedor verificado:", profile);
+
+    // 6. Asignar rol "proveedor" usando la misma tabla de roles/user_roles que para usuarios
+    const { data: roleData, error: roleError } = await supabaseAdmin
+      .from("roles")
+      .select("id, name")
+      .eq("name", "proveedor")
+      .single();
+
+    if (roleError) {
+      console.error("❌ Error buscando rol 'proveedor':", roleError);
+      throw roleError;
+    }
+
+    if (!roleData) {
+      throw new Error("No existe el rol 'proveedor' en la tabla roles");
+    }
+
+    const { error: userRolesError } = await supabaseAdmin
+      .from("user_roles")
+      .upsert(
+        { user_id: userId, role_id: roleData.id },
+        {
+          onConflict: "user_id,role_id",
+          ignoreDuplicates: true,
+        },
+      );
+
+    if (userRolesError) {
+      console.error("❌ Error asignando rol 'proveedor':", userRolesError);
+      throw userRolesError;
+    }
+
+    console.log("✅ Rol 'proveedor' asignado correctamente");
 
     return new Response(
       JSON.stringify({

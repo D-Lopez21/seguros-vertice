@@ -96,6 +96,7 @@ export interface Bill {
   analyst_pagador?: string;
   fecha_envio?: string;
   analyst_paid?: string;
+  analyst_settlement?: string;
   state?: string;
   active: boolean;
   created_at?: string;

@@ -55,6 +55,14 @@ const css = `
     min-width: 0;
   }
 
+  /* Contenedor de múltiples badges */
+  .upc-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 2px;
+  }
+
   .upc-badge {
     display: inline-flex;
     align-items: center;
@@ -66,8 +74,6 @@ const css = `
     border-radius: 99px;
     padding: 3px 10px;
     border: 1px solid transparent;
-    align-self: flex-start;
-    margin-bottom: 2px;
   }
 
   .upc-badge svg { flex-shrink: 0; }
@@ -156,7 +162,9 @@ export default function UserProfileCard() {
 
   const name  = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Usuario';
   const email = user?.email || '';
-  const role  = user?.user_metadata?.role || user?.profile?.role || 'usuario';
+
+  // Leer roles como array desde profile
+  const roles: string[] = user?.profile?.roles ?? [];
 
   const initials = name
     .split(' ')
@@ -164,8 +172,6 @@ export default function UserProfileCard() {
     .slice(0, 2)
     .join('')
     .toUpperCase();
-
-  const roleInfo = roleLabels[role] ?? { label: role, cls: 'upc-badge-default' };
 
   return (
     <>
@@ -175,12 +181,31 @@ export default function UserProfileCard() {
         <div className="upc-avatar">{initials}</div>
 
         <div className="upc-info">
-          <div className={`upc-badge ${roleInfo.cls}`}>
-            <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-            </svg>
-            {roleInfo.label}
+
+          {/* Badges de roles — uno por cada rol asignado */}
+          <div className="upc-badges">
+            {roles.length > 0 ? (
+              roles.map(role => {
+                const info = roleLabels[role] ?? { label: role, cls: 'upc-badge-default' };
+                return (
+                  <span key={role} className={`upc-badge ${info.cls}`}>
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                    </svg>
+                    {info.label}
+                  </span>
+                );
+              })
+            ) : (
+              <span className="upc-badge upc-badge-default">
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                </svg>
+                Usuario
+              </span>
+            )}
           </div>
+
           <div className="upc-name">Bienvenido, {name.split(' ')[0]}</div>
           <div className="upc-email">{email}</div>
         </div>

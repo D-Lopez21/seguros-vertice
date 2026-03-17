@@ -1,142 +1,103 @@
-/// <reference types="deno" />
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const supabaseAdmin = createClient(
-  Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-);
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, x-invite-secret",
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+  // Manejar preflight CORS
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    // Verificar secret de invitación
-    const secretHeader = req.headers.get("x-invite-secret");
-    if (secretHeader !== Deno.env.get("INVITE_SECRET")) {
-      return new Response(JSON.stringify({ error: "No autorizado" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    const { email, name, roles, active } = await req.json();
 
-    // Parsear datos del body
-    const { email, fullName, role, rif } = await req.json();
-    
     // Validaciones básicas
-    if (!email || !fullName || !role) {
-      return new Response(JSON.stringify({ error: "Datos incompletos: email, fullName y role son requeridos" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Validar formato de RIF si se proporciona
-    if (rif) {
-      const rifRegex = /^[JVEG]-\d{8,9}-?\d?$/i;
-      if (!rifRegex.test(rif)) {
-        return new Response(
-          JSON.stringify({ error: "Formato de RIF inválido. Use el formato: J-12345678-9" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-    }
-
-    // Verificar si el email ya existe en Auth
-    const { data: existingAuthUser } = await supabaseAdmin.auth.admin.listUsers();
-    const userExists = existingAuthUser.users.some(u => u.email === email);
-
-    if (userExists) {
+    if (!email || !name || !roles?.length) {
       return new Response(
-        JSON.stringify({ error: "Este correo electrónico ya está registrado" }),
-        { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: 'Faltan campos requeridos.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // URL de redirección
-    const redirectUrl = Deno.env.get("SITE_URL") 
-      ? `${Deno.env.get("SITE_URL")}/reset-password`
-      : "http://localhost:5173/reset-password";
+    // Cliente con service_role (permisos de administrador)
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
 
-    // Construir metadata para el trigger (usar raw_user_meta_data)
-    const userMetadata: Record<string, any> = {
-      name: fullName, 
-      role: role,
-    };
+    // URL base del frontend para los enlaces de invitación / recuperación
+    const frontendUrl = Deno.env.get('FRONTEND_URL') ?? 'https://seguros-vertice.onrender.com';
 
-    // Agregar RIF a metadata solo si existe
-    if (rif) {
-      userMetadata.rif = rif;
+    // 1. Verificar si el email ya existe
+    const { data: existingUsers, error: listError } = await supabase.auth.admin.listUsers();
+    if (listError) throw listError;
+
+    const emailExists = existingUsers?.users?.some(u => u.email === email);
+    if (emailExists) {
+      return new Response(
+        JSON.stringify({ error: 'Ya existe un usuario con ese correo electrónico.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    // Invitar usuario en Auth (el trigger handle_new_user_invite creará el perfil automáticamente)
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
-      email,
-      {
-        data: userMetadata,
-        redirectTo: redirectUrl,
-      }
-    );
+    // 2. Invitar usuario — le llega un correo para que establezca su contraseña
+    const { data: authData, error: authError } = await supabase.auth.admin.inviteUserByEmail(email, {
+      data: { name, roles }, // se guarda en user_metadata
+      // Enlace llevará al formulario personalizado de nueva contraseña
+      redirectTo: `${frontendUrl}/reset-password`,
+    });
 
     if (authError) throw authError;
 
-    if (!authData.user) {
-      throw new Error("Error al crear el usuario en Auth");
+    const userId = authData.user.id;
+    console.log('✅ Invitación enviada a:', email, 'ID:', userId);
+
+    // 3. Buscar IDs de los roles seleccionados
+    const { data: roleData, error: roleError } = await supabase
+      .from('roles')
+      .select('id, name')
+      .in('name', roles);
+
+    if (roleError) throw roleError;
+    console.log('✅ Roles encontrados:', roleData);
+
+    // 4. Insertar relaciones en user_roles (evitando duplicados)
+    if (roleData && roleData.length > 0) {
+      const rows = roleData.map((r: any) => ({
+        user_id: userId,
+        role_id: r.id,
+      }));
+
+      // Usamos upsert + onConflict para evitar violar la PK (user_id, role_id)
+      const { error: userRolesError } = await supabase
+        .from('user_roles')
+        .upsert(rows, {
+          onConflict: 'user_id,role_id',
+          ignoreDuplicates: true,
+        });
+
+      if (userRolesError) throw userRolesError;
+      console.log('✅ Roles asignados correctamente (sin duplicados)');
     }
 
-    console.log("✅ Usuario creado en Auth:", authData.user.id);
-    console.log("✅ El trigger debería crear el perfil automáticamente");
-
-    // Esperar un momento para que el trigger se ejecute
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    // Verificar que el perfil se creó
-    const { data: profile, error: profileCheckError } = await supabaseAdmin
-      .from("profile")
-      .select("*")
-      .eq("id", authData.user.id)
-      .single();
-
-    if (profileCheckError || !profile) {
-      console.error("❌ El trigger no creó el perfil:", profileCheckError);
-      throw new Error("Error: el perfil no se creó automáticamente");
+    // 5. Si active es false, actualizar el perfil
+    if (!active) {
+      await supabase.from('profile').update({ active: false }).eq('id', userId);
     }
-
-    console.log("✅ Perfil verificado:", profile);
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        user: {
-          id: authData.user.id,
-          email: email,
-          name: fullName, 
-          role: role,
-          ...(rif && { rif }),
-        },
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      JSON.stringify({ id: userId }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-  } catch (err: any) {
-    console.error("❌ Error en invite-user:", err);
+  } catch (error: any) {
+    console.error('❌ Error:', error.message);
     return new Response(
-      JSON.stringify({ error: err.message || "Error interno del servidor" }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      JSON.stringify({ error: error.message }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

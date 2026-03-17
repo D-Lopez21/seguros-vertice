@@ -17,6 +17,7 @@ import {
   BillDetailsPage,
   BillsPage,
   ProvidersPage,
+  Export
 } from './pages';
 import { AuthProvider } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/common/ProtectedRoute';
@@ -111,12 +112,20 @@ function AppWithDebug() {
           <BillsPage />
         </ProtectedRoute>
       ),
-    },
+    },    
     {
       path: 'bills/:id',
       element: (
         <ProtectedRoute>
           <BillDetailsPage />
+        </ProtectedRoute>
+      ),
+    },
+        {
+      path: 'bills/export',
+      element: (
+        <ProtectedRoute>
+          <Export />
         </ProtectedRoute>
       ),
     },

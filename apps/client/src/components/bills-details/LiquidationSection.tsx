@@ -5,7 +5,7 @@ import Modal from './BillModal';
 const CLAIM_TYPES = [
   'AMBULATORIO', 'APS', 'CARTA AVAL', 'FARMACIA', 'HOSPITALIZACION',
   'JORNADA', 'LABORATORIO', 'ONCOLOGICO', 'TRASLADO EN AMBULANCIA',
-  'HOME CARE', 'PREGRADO', 'JUNTA MEDICA',
+  'HOME CARE', 'PREPAGO', 'JUNTA MEDICA'
 ];
 
 export default function LiquidationSection({
@@ -16,11 +16,12 @@ export default function LiquidationSection({
   loading,
   allUsers,
   canEdit,
-  userRole,
   billState,
   currentBill,
+  isProveedor,
 }: any) {
   const [modalOpen, setModalOpen] = React.useState(false);
+  const [isRetentionManual, setIsRetentionManual] = React.useState(false);
 
   const handleInputChange = (fieldName: string, value: string) => {
     let cleanValue = value;
@@ -31,19 +32,25 @@ export default function LiquidationSection({
   };
 
   const montoFactNum = parseFloat(data.monto_fact) || 0;
-  const gna = parseFloat(data.gna) || 0;
   const honorarios = parseFloat(data.honorarios_medic) || 0;
   const servicios = parseFloat(data.servicios_clinicos) || 0;
 
-  const montoAmp = gna + honorarios + servicios;
-  const retencion = montoFactNum * 0.05;
-  const montoIndemniz = montoAmp - retencion;
+  const montoAmp = honorarios + servicios;
+  const defaultRetencion = servicios * 0.05; // ✅ CAMBIADO: ahora es 5% de Servicios Clínicos
+  const retencionActual = isRetentionManual
+    ? (parseFloat(data.retention_rate) || 0)
+    : defaultRetencion;
+  const montoIndemniz = montoAmp - retencionActual;
 
   React.useEffect(() => {
-    if (data.monto_amp !== String(montoAmp) || data.monto_indemniz !== String(montoIndemniz)) {
-      setData({ ...data, monto_amp: String(montoAmp), monto_indemniz: String(montoIndemniz) });
+    const updates: any = {};
+    if (data.monto_amp !== String(montoAmp)) updates.monto_amp = String(montoAmp);
+    if (data.monto_indemniz !== String(montoIndemniz)) updates.monto_indemniz = String(montoIndemniz);
+    if (!isRetentionManual && data.retention_rate !== String(defaultRetencion)) {
+      updates.retention_rate = String(defaultRetencion);
     }
-  }, [montoAmp, montoIndemniz]);
+    if (Object.keys(updates).length > 0) setData({ ...data, ...updates });
+  }, [montoAmp, montoIndemniz, defaultRetencion, isRetentionManual]);
 
   const montosCoinciden = Math.abs(montoAmp - montoFactNum) < 0.01;
 
@@ -67,26 +74,16 @@ export default function LiquidationSection({
     <div className="space-y-6">
 
       {/* Banner Modo Lectura */}
-      {isReadOnly && !isDevuelto && (
+      {isReadOnly && !isDevuelto && !isProveedor && (
         <div className="bg-amber-50 border-l-4 border-amber-400 p-4 shadow-sm rounded-r-lg flex items-center">
           <div className="ml-3">
             <p className="text-sm text-amber-800">
-              Usted está en modo <span className="font-bold">Vista Previa</span>. 
-              Su rol actual (<span className="font-mono bg-amber-100 px-1 rounded">{userRole}</span>) no permite editar esta sección.
+              Usted está en modo <span className="font-bold">Vista Previa</span>.
+              Solo puede editar esta sección el analista que la guardó originalmente o un usuario con rol <span className="font-mono bg-amber-100 px-1 rounded">admin</span>.
             </p>
           </div>
         </div>
       )}
-
-      {/* Barra de estado */}
-      <div className="bg-slate-50 border border-slate-200 p-2.5 rounded-lg flex justify-between text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-        <span>
-          Acceso: <span className="text-slate-800">{userRole || 'ADMIN'}</span>
-        </span>
-        <span>
-          Estado Factura: <span className="text-blue-600">{billState || 'PENDIENTE'}</span>
-        </span>
-      </div>
 
       {/* Card principal */}
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
@@ -137,7 +134,7 @@ export default function LiquidationSection({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Monto AMP (GNA + HM + SC)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Monto AMP (HM + SC)</label>
               <div
                 className={`w-full px-4 py-2.5 rounded-lg border font-bold transition-all
                   ${montosCoinciden
@@ -174,11 +171,52 @@ export default function LiquidationSection({
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('servicios_clinicos', e.target.value)}
               disabled={isReadOnly}
             />
+
+            {/* Retención — editable con opción de restablecer */}
             <div>
-              <label className="block text-sm font-medium text-slate-400 mb-1">Retención 5% (Calculada)</label>
-              <div className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-lg text-slate-500">
-                {retencion.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+              <label
+                className={`block text-sm font-medium mb-1 transition-colors ${
+                  isRetentionManual ? 'text-orange-600' : 'text-slate-400'
+                }`}
+              >
+                Retención {isRetentionManual ? '(Editada)' : '5% SC (Calculada)'}
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  value={isRetentionManual ? data.retention_rate : retencionActual}
+                  onChange={(e) => {
+                    setIsRetentionManual(true);
+                    handleInputChange('retention_rate', e.target.value);
+                  }}
+                  readOnly={isReadOnly}
+                  className={`w-full px-4 py-2.5 rounded-lg border outline-none transition-all ${
+                    isReadOnly
+                      ? 'bg-slate-50 border-slate-100 text-slate-500 cursor-not-allowed'
+                      : isRetentionManual
+                      ? 'bg-orange-50 border-orange-300 text-orange-700 font-semibold pr-24'
+                      : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 focus:border-blue-400'
+                  }`}
+                />
+                {isRetentionManual && !isReadOnly && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsRetentionManual(false);
+                      setData({ ...data, retention_rate: String(defaultRetencion) });
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-orange-500 hover:text-orange-700 font-semibold underline whitespace-nowrap"
+                    title="Restablecer al 5% de Servicios Clínicos"
+                  >
+                    Restablecer
+                  </button>
+                )}
               </div>
+              {isRetentionManual && (
+                <p className="text-xs text-orange-500 mt-1">
+                  Valor automático (5% SC): {defaultRetencion.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                </p>
+              )}
             </div>
           </div>
 
