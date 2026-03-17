@@ -2,6 +2,7 @@
 import React from 'react';
 import { supabase } from '../lib/supabase';
 import { DashboardLayout } from './common';
+import { useAuth } from '../hooks/useAuth';
 
 // ─── tipos ────────────────────────────────────────────────────────────────────
 type DateField =
@@ -27,8 +28,6 @@ const DATE_OPTIONS: DateOption[] = [
   { value: 'settlement_date', label: 'Fecha de Finiquito'            },
 ];
 
-// Orden y etiquetas en español de todas las columnas (sin IDs de Supabase)
-// agrupadas por sección: recepcion → liquidacion → auditoria → programacion → pago → finiquito
 const COLUMN_MAP: { key: string; label: string }[] = [
   // ── RECEPCIÓN ──
   { key: 'arrival_date',          label: 'Fecha de Recepción'            },
@@ -92,7 +91,6 @@ function escapeCSV(value: any): string {
   return str;
 }
 
-// Convierte array de objetos a CSV y dispara descarga
 function downloadCSV(rows: Record<string, any>[], filename: string) {
   const headers = COLUMN_MAP.map(c => c.label);
   const lines = [
@@ -111,9 +109,6 @@ function downloadCSV(rows: Record<string, any>[], filename: string) {
   a.click();
   URL.revokeObjectURL(url);
 }
-
-// ─── generador XLSX nativo (sin SheetJS) usando JSZip ────────────────────────
-// JSZip es segura, sin vulnerabilidades conocidas, y soporta browser nativo.
 
 async function loadJSZip(): Promise<any> {
   if ((window as any).JSZip) return (window as any).JSZip;
@@ -137,10 +132,7 @@ function xmlEsc(v: any): string {
     .replace(/'/g, '&apos;');
 }
 
-// Construye el XML de la hoja de cálculo (xl/worksheets/sheet1.xml)
 function buildSheetXml(headers: string[], dataRows: any[][]): string {
-
-  // Convierte índice numérico de columna (0-based) a letra Excel (A, B, ... Z, AA, ...)
   const colLetter = (n: number): string => {
     let s = '';
     n += 1;
@@ -154,7 +146,6 @@ function buildSheetXml(headers: string[], dataRows: any[][]): string {
 
   const cellRef = (col: number, row: number) => `${colLetter(col)}${row}`;
 
-  // Calcula anchos de columna (en caracteres)
   const colWidths = headers.map((h, i) => {
     const maxData = dataRows.reduce((max, row) => {
       const len = String(row[i] ?? '').length;
@@ -167,13 +158,11 @@ function buildSheetXml(headers: string[], dataRows: any[][]): string {
     .map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`)
     .join('');
 
-  // Fila de cabecera (styleId=1 → negrita + fondo azul)
   const headerCells = headers
     .map((h, ci) => `<c r="${cellRef(ci, 1)}" t="inlineStr" s="1"><is><t>${xmlEsc(h)}</t></is></c>`)
     .join('');
   const headerRow = `<row r="1">${headerCells}</row>`;
 
-  // Filas de datos
   const dataRowsXml = dataRows.map((row, ri) => {
     const cells = row.map((val, ci) => {
       const ref = cellRef(ci, ri + 2);
@@ -192,7 +181,6 @@ function buildSheetXml(headers: string[], dataRows: any[][]): string {
 </worksheet>`;
 }
 
-// Construye styles.xml con un estilo de cabecera (negrita, fondo azul #1a56ff, texto blanco)
 function buildStylesXml(): string {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
@@ -229,7 +217,6 @@ async function downloadXLSX(rows: Record<string, any>[], filename: string) {
 
   const zip = new JSZip();
 
-  // Estructura mínima de un .xlsx (OOXML)
   zip.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
@@ -270,7 +257,7 @@ async function downloadXLSX(rows: Record<string, any>[], filename: string) {
   URL.revokeObjectURL(url);
 }
 
-// ─── icono SVG inline ─────────────────────────────────────────────────────────
+// ─── iconos SVG inline ────────────────────────────────────────────────────────
 function DownloadIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -293,7 +280,6 @@ function FileSpreadsheetIcon({ className }: { className?: string }) {
   );
 }
 
-
 // ─── componente principal ─────────────────────────────────────────────────────
 
 type FilterMode = 'fecha' | 'estado';
@@ -309,19 +295,33 @@ const STATE_OPTIONS = [
 ];
 
 export default function ExportPage() {
-  const [filterMode, setFilterMode]     = React.useState<FilterMode>('fecha');
-  const [dateField, setDateField]       = React.useState<DateField>('arrival_date');
-  const [dateFrom, setDateFrom]         = React.useState('');
-  const [dateTo, setDateTo]             = React.useState('');
-  const [stateFilter, setStateFilter]   = React.useState('');
-  const [format, setFormat]             = React.useState<'xlsx' | 'csv'>('xlsx');
-  const [loading, setLoading]           = React.useState(false);
-  const [error, setError]               = React.useState<string | null>(null);
-  const [preview, setPreview]           = React.useState<number | null>(null);
+  // ── auth ──────────────────────────────────────────────────────────────────
+  const { user } = useAuth();
+  const isProvider   = user?.profile?.roles?.includes('proveedor') ?? false;
+  const providerId   = user?.profile?.id ?? null;
+
+  // ── estado ────────────────────────────────────────────────────────────────
+  const [filterMode, setFilterMode]   = React.useState<FilterMode>('fecha');
+  const [dateField, setDateField]     = React.useState<DateField>('arrival_date');
+  const [dateFrom, setDateFrom]       = React.useState('');
+  const [dateTo, setDateTo]           = React.useState('');
+  const [stateFilter, setStateFilter] = React.useState('');
+  const [format, setFormat]           = React.useState<'xlsx' | 'csv'>('xlsx');
+  const [loading, setLoading]         = React.useState(false);
+  const [error, setError]             = React.useState<string | null>(null);
+  const [preview, setPreview]         = React.useState<number | null>(null);
 
   const canExport = !loading && (
     filterMode === 'fecha' ? (!!dateFrom && !!dateTo) : !!stateFilter
   );
+
+  // ── helper: aplica filtro de proveedor si corresponde ────────────────────
+  const applyProviderFilter = (query: any) => {
+    if (isProvider && providerId) {
+      return query.eq('suppliers_id', providerId);
+    }
+    return query;
+  };
 
   // ── enriquece bills con perfiles ──────────────────────────────────────────
   const enrichBills = async (bills: any[]) => {
@@ -342,50 +342,50 @@ export default function ExportPage() {
     const getRIF  = (id?: string | null) => id && profileMap[id] ? (profileMap[id].rif ?? '') : '';
 
     return bills.map(b => ({
-      arrival_date:       formatDate(b.arrival_date),
-      n_claim:            b.n_claim            ?? '',
-      type:               b.type               ?? '',
-      n_billing:          b.n_billing          ?? '',
-      n_control:          b.n_control          ?? '',
-      currency_type:      b.currency_type      ?? '',
-      total_billing:      b.total_billing      ?? '',
-      proveedor_nombre:   getName(b.suppliers_id),
-      proveedor_rif:      getRIF(b.suppliers_id),
-      receptor_nombre:    getName(b.analyst_receptor_id),
-      severance_date:     formatDate(b.severance_date),
-      claim_type:         b.claim_type         ?? '',
-      monto_amp:          b.monto_amp          ?? '',
-      gna:                b.gna                ?? '',
-      medical_honoraries: b.medical_honoraries ?? '',
-      clinical_services:  b.clinical_services  ?? '',
-      retention_rate:     b.retention_rate     ?? '',
-      indemnizable_rate:  b.indemnizable_rate  ?? '',
-      nomenclature_pile:  b.nomenclature_pile  ?? '',
-      liquidador_nombre:  getName(b.analyst_severance),
-      audit_date:         formatDate(b.audit_date),
-      auditor_nombre:     getName(b.auditor),
-      programmed_date:    formatDate(b.programmed_date),
-      admin_decision:     b.admin_decision      ?? '',
-      programador_nombre: getName(b.analyst_schedule),
-      paid_date:          formatDate(b.paid_date),
-      bs_amount:          b.bs_amount           ?? '',
-      tcr_amount:         b.tcr_amount          ?? '',
-      dollar_amount:      b.dollar_amount        ?? '',
-      transfer_ref:       b.transfer_ref         ?? '',
-      vertice_difference: b.vertice_difference   ?? '',
-      provider_difference:b.provider_difference  ?? '',
-      pagador_nombre:     getName(b.analyst_paid),
-      settlement_date:    formatDate(b.settlement_date),
-      finiquito_nombre:   getName(b.analyst_settlement),
-      state:              b.state               ?? '',
-      state_sequence:     b.state_sequence      ?? '',
-      active:             b.active,
+      arrival_date:        formatDate(b.arrival_date),
+      n_claim:             b.n_claim            ?? '',
+      type:                b.type               ?? '',
+      n_billing:           b.n_billing          ?? '',
+      n_control:           b.n_control          ?? '',
+      currency_type:       b.currency_type      ?? '',
+      total_billing:       b.total_billing      ?? '',
+      proveedor_nombre:    getName(b.suppliers_id),
+      proveedor_rif:       getRIF(b.suppliers_id),
+      receptor_nombre:     getName(b.analyst_receptor_id),
+      severance_date:      formatDate(b.severance_date),
+      claim_type:          b.claim_type         ?? '',
+      monto_amp:           b.monto_amp          ?? '',
+      gna:                 b.gna                ?? '',
+      medical_honoraries:  b.medical_honoraries ?? '',
+      clinical_services:   b.clinical_services  ?? '',
+      retention_rate:      b.retention_rate     ?? '',
+      indemnizable_rate:   b.indemnizable_rate  ?? '',
+      nomenclature_pile:   b.nomenclature_pile  ?? '',
+      liquidador_nombre:   getName(b.analyst_severance),
+      audit_date:          formatDate(b.audit_date),
+      auditor_nombre:      getName(b.auditor),
+      programmed_date:     formatDate(b.programmed_date),
+      admin_decision:      b.admin_decision     ?? '',
+      programador_nombre:  getName(b.analyst_schedule),
+      paid_date:           formatDate(b.paid_date),
+      bs_amount:           b.bs_amount          ?? '',
+      tcr_amount:          b.tcr_amount         ?? '',
+      dollar_amount:       b.dollar_amount      ?? '',
+      transfer_ref:        b.transfer_ref       ?? '',
+      vertice_difference:  b.vertice_difference ?? '',
+      provider_difference: b.provider_difference ?? '',
+      pagador_nombre:      getName(b.analyst_paid),
+      settlement_date:     formatDate(b.settlement_date),
+      finiquito_nombre:    getName(b.analyst_settlement),
+      state:               b.state              ?? '',
+      state_sequence:      b.state_sequence     ?? '',
+      active:              b.active,
     }));
   };
 
-  // ── consulta principal ─────────────────────────────────────────────────────
+  // ── consulta principal ────────────────────────────────────────────────────
   const fetchData = async (): Promise<Record<string, any>[]> => {
-    let query = supabase.from('bills').select('*');
+    let query = applyProviderFilter(supabase.from('bills').select('*'));
 
     if (filterMode === 'fecha') {
       if (!dateFrom || !dateTo) throw new Error('Debes seleccionar un rango de fechas.');
@@ -405,11 +405,13 @@ export default function ExportPage() {
     return enrichBills(bills);
   };
 
-  // ── previsualizar cantidad ─────────────────────────────────────────────────
+  // ── previsualizar cantidad ────────────────────────────────────────────────
   const handlePreview = async () => {
     setError(null);
     try {
-      let query = supabase.from('bills').select('id', { count: 'exact', head: true });
+      let query = applyProviderFilter(
+        supabase.from('bills').select('id', { count: 'exact', head: true })
+      );
       if (filterMode === 'fecha') {
         if (!dateFrom || !dateTo) return;
         const from = `${dateFrom}T00:00:00`;
@@ -436,7 +438,7 @@ export default function ExportPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterMode, dateField, dateFrom, dateTo, stateFilter]);
 
-  // ── exportar ───────────────────────────────────────────────────────────────
+  // ── exportar ──────────────────────────────────────────────────────────────
   const handleExport = async () => {
     if (!canExport) return;
     setLoading(true);
@@ -479,7 +481,9 @@ export default function ExportPage() {
             <div>
               <h2 className="text-white font-semibold text-base leading-tight">Exportación de Datos</h2>
               <p className="text-white/70 text-xs mt-0.5">
-                Filtra facturas por rango de fecha o por estado y descarga el reporte
+                {isProvider
+                  ? 'Descarga el reporte de tus facturas'
+                  : 'Filtra facturas por rango de fecha o por estado y descarga el reporte'}
               </p>
             </div>
           </div>
@@ -611,10 +615,12 @@ export default function ExportPage() {
                 { label: 'Desde',         value: dateFrom   || '—'   },
                 { label: 'Hasta',         value: dateTo     || '—'   },
                 { label: 'Formato',       value: format.toUpperCase() },
+                ...(isProvider ? [{ label: 'Proveedor', value: 'Solo mis facturas' }] : []),
               ] : [
                 { label: 'Modo',    value: 'Por estado'          },
                 { label: 'Estado',  value: selectedStateLabel    },
                 { label: 'Formato', value: format.toUpperCase()  },
+                ...(isProvider ? [{ label: 'Proveedor', value: 'Solo mis facturas' }] : []),
               ]).map(row => (
                 <div key={row.label} className="flex justify-between items-center py-2.5 border-b border-neutral-100 last:border-0">
                   <span className="text-sm text-neutral-500">{row.label}</span>

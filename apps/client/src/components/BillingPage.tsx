@@ -39,14 +39,14 @@ export default function BillingPage() {
   return (
     <DashboardLayout title="Sistema Administrativo Vertice" returnTo="/">
       <div className="w-full flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
-        
+
         {/* Barra de búsqueda/filtro */}
         <div className="flex bg-white border border-neutral-200 rounded-lg p-1 shadow-sm w-full md:w-auto items-center">
-          <select 
+          <select
             value={filterType}
             onChange={(e) => {
               setFilterType(e.target.value as FilterType);
-              setSearchTerm(''); 
+              setSearchTerm('');
             }}
             className="bg-transparent text-sm font-medium px-3 outline-none border-r border-neutral-200 cursor-pointer text-neutral-600 h-9"
           >
@@ -83,10 +83,10 @@ export default function BillingPage() {
         </div>
 
         {/* Botones de acción */}
-        {!isProvider && (
-          <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2">
 
-            {/* Botón Exportar — verde esmeralda */}
+          {/* Exportar — solo admin y proveedor */}
+          {(isAdmin || isProvider) && (
             <button
               onClick={() => navigate('export')}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white text-sm font-semibold shadow-sm transition-colors"
@@ -94,8 +94,10 @@ export default function BillingPage() {
               <DownloadIcon className="size-4" />
               Exportar facturas
             </button>
+          )}
 
-            {/* Botón Nueva Factura — azul */}
+          {/* Nueva Factura — solo no-proveedores */}
+          {!isProvider && (
             <Button
               icon={<PlusIcon className="size-5" />}
               onClick={() => canCreateBill && navigate('create-bill')}
@@ -105,17 +107,17 @@ export default function BillingPage() {
             >
               Nueva Factura
             </Button>
+          )}
 
-          </div>
-        )}
+        </div>
       </div>
 
-      <BillsTable 
+      <BillsTable
         bills={bills}
         loading={loading}
         error={error}
-        searchTerm={searchTerm} 
-        filterType={filterType} 
+        searchTerm={searchTerm}
+        filterType={filterType}
         getProviderName={getProviderName}
         onDelete={(id) => {
           if (window.confirm('¿Eliminar esta factura?')) deleteBill(id);
