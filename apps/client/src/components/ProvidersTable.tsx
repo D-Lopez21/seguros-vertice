@@ -2,11 +2,14 @@ import { EditIcon, TrashIcon } from './icons';
 import type { Profile } from '../contexts/AuthContext';
 
 interface ProvidersTableProps {
-  providers: Profile[]; // Recibe los datos del padre
-  loading: boolean;     // Recibe el estado de carga
+  providers: Profile[];
+  loading: boolean;
   searchTerm: string;
   onEdit: (provider: Profile) => void;
   onDelete: (id: string, name: string) => void;
+  page: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
 }
 
 export default function ProvidersTable({ 
@@ -14,14 +17,20 @@ export default function ProvidersTable({
   loading, 
   searchTerm, 
   onEdit, 
-  onDelete 
+  onDelete,
+  page,
+  pageSize,
+  onPageChange,
 }: ProvidersTableProps) {
 
-  // Ya no llamamos al hook aquí. Usamos los proveedores que llegan por props.
   const filteredProviders = (providers || []).filter((provider) =>
     provider.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (provider.rif && provider.rif.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+
+  const totalPages = Math.max(1, Math.ceil(filteredProviders.length / pageSize));
+  const safePage = Math.min(page, totalPages - 1);
+  const paginated = filteredProviders.slice(safePage * pageSize, safePage * pageSize + pageSize);
 
   if (loading) return <div className="py-10 text-center text-neutral-500 italic">Cargando proveedores...</div>;
 
@@ -38,8 +47,8 @@ export default function ProvidersTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100">
-            {filteredProviders.length > 0 ? (
-              filteredProviders.map((provider) => (
+            {paginated.length > 0 ? (
+              paginated.map((provider) => (
                 <tr key={provider.id} className="hover:bg-neutral-50/50 transition-colors">
                   <td className="px-6 py-4 font-medium text-neutral-900">{provider.name}</td>
                   <td className="px-6 py-4">
@@ -72,6 +81,44 @@ export default function ProvidersTable({
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Paginación */}
+      <div className="flex items-center justify-between px-6 py-3 border-t border-neutral-100 bg-neutral-50/50">
+        <span className="text-xs text-neutral-400">
+          {filteredProviders.length === 0
+            ? 'Sin resultados'
+            : `${safePage * pageSize + 1}–${Math.min(safePage * pageSize + pageSize, filteredProviders.length)} de ${filteredProviders.length} proveedores`}
+        </span>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => onPageChange(safePage - 1)}
+            disabled={safePage === 0}
+            className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-500 hover:bg-neutral-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          >
+            ← Anterior
+          </button>
+          {Array.from({ length: totalPages }, (_, i) => (
+            <button
+              key={i}
+              onClick={() => onPageChange(i)}
+              className={`w-7 h-7 rounded-lg text-xs font-medium transition-colors ${
+                i === safePage
+                  ? 'bg-neutral-900 text-white'
+                  : 'text-neutral-500 hover:bg-neutral-100'
+              }`}
+            >
+              {i + 1}
+            </button>
+          ))}
+          <button
+            onClick={() => onPageChange(safePage + 1)}
+            disabled={safePage >= totalPages - 1}
+            className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-500 hover:bg-neutral-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          >
+            Siguiente →
+          </button>
+        </div>
       </div>
     </div>
   );

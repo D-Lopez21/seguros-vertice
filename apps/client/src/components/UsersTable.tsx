@@ -9,6 +9,9 @@ interface Props {
   filterType: 'name' | 'role';
   onEdit: (user: Profile) => void;
   onDelete: (id: string, name: string) => void;
+  page: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
 }
 
 const ROLE_STYLES: Record<string, string> = {
@@ -33,7 +36,10 @@ const ROLE_LABELS: Record<string, string> = {
   proveedor:    'Proveedor',
 };
 
-export default function UsersTable({ users, loading, error, searchTerm, filterType, onEdit, onDelete }: Props) {
+export default function UsersTable({
+  users, loading, error, searchTerm, filterType,
+  onEdit, onDelete, page, pageSize, onPageChange,
+}: Props) {
   const filteredUsers = users.filter((user) => {
     if (!searchTerm) return true;
     const term = searchTerm.toLowerCase();
@@ -42,8 +48,12 @@ export default function UsersTable({ users, loading, error, searchTerm, filterTy
       : user?.roles?.some(r => r.toLowerCase().includes(term));
   });
 
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / pageSize));
+  const safePage = Math.min(page, totalPages - 1);
+  const paginated = filteredUsers.slice(safePage * pageSize, safePage * pageSize + pageSize);
+
   if (loading) return <div className="py-10 text-center text-neutral-500 italic">Cargando usuarios...</div>;
-  if (error) return <div className="py-10 text-center text-red-500">Error: {error}</div>;
+  if (error)   return <div className="py-10 text-center text-red-500">Error: {error}</div>;
 
   return (
     <div className="w-full overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
@@ -58,14 +68,14 @@ export default function UsersTable({ users, loading, error, searchTerm, filterTy
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100">
-            {filteredUsers.length === 0 ? (
+            {paginated.length === 0 ? (
               <tr>
                 <td colSpan={4} className="py-10 text-center text-neutral-400 italic">
                   No se encontraron usuarios.
                 </td>
               </tr>
             ) : (
-              filteredUsers.map((user) => (
+              paginated.map((user) => (
                 <tr key={user.id} className="hover:bg-neutral-50/50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="font-medium text-neutral-900">{user.name || 'Sin nombre'}</div>
@@ -110,6 +120,44 @@ export default function UsersTable({ users, loading, error, searchTerm, filterTy
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Paginación */}
+      <div className="flex items-center justify-between px-6 py-3 border-t border-neutral-100 bg-neutral-50/50">
+        <span className="text-xs text-neutral-400">
+          {filteredUsers.length === 0
+            ? 'Sin resultados'
+            : `${safePage * pageSize + 1}–${Math.min(safePage * pageSize + pageSize, filteredUsers.length)} de ${filteredUsers.length} usuarios`}
+        </span>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => onPageChange(safePage - 1)}
+            disabled={safePage === 0}
+            className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-500 hover:bg-neutral-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          >
+            ← Anterior
+          </button>
+          {Array.from({ length: totalPages }, (_, i) => (
+            <button
+              key={i}
+              onClick={() => onPageChange(i)}
+              className={`w-7 h-7 rounded-lg text-xs font-medium transition-colors ${
+                i === safePage
+                  ? 'bg-neutral-900 text-white'
+                  : 'text-neutral-500 hover:bg-neutral-100'
+              }`}
+            >
+              {i + 1}
+            </button>
+          ))}
+          <button
+            onClick={() => onPageChange(safePage + 1)}
+            disabled={safePage >= totalPages - 1}
+            className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-500 hover:bg-neutral-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          >
+            Siguiente →
+          </button>
+        </div>
       </div>
     </div>
   );

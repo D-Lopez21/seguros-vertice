@@ -5,14 +5,20 @@ import ProvidersTable from './ProvidersTable';
 import { useGetAllProviders } from '../hooks/useGetAllProviders';
 import type { Profile } from '../contexts/AuthContext';
 
+const PAGE_SIZE = 10;
+
 export default function ProvidersPage() {
-  const { providers, loading, updateProvider, deleteProvider } = useGetAllProviders(); // ← SIN refetch
+  const { providers, loading, updateProvider, deleteProvider } = useGetAllProviders();
   
   const [modalIsOpen, setModalIsOpen] = React.useState(false);
   const [searchTerm, setSearchTerm] = React.useState('');
-  const [providerToEdit, setProviderToEdit] = React.useState<Profile | null>(
-    null
-  );
+  const [providerToEdit, setProviderToEdit] = React.useState<Profile | null>(null);
+  const [page, setPage] = React.useState(0);
+
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+    setPage(0);
+  };
 
   const handleEdit = (provider: Profile) => {
     setProviderToEdit(provider);
@@ -56,7 +62,7 @@ export default function ProvidersPage() {
             placeholder="Buscar proveedor o RIF..."
             className="text-sm px-2 py-1.5 outline-none w-full sm:w-80"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
           />
         </div>
 
@@ -88,9 +94,12 @@ export default function ProvidersPage() {
         searchTerm={searchTerm}
         onEdit={handleEdit}
         onDelete={handleDelete}
+        page={page}
+        pageSize={PAGE_SIZE}
+        onPageChange={setPage}
       />
 
-      {/* Modal - REALTIME AHORA FUNCIONA */}
+      {/* Modal */}
       <ProviderRegistrationModal
         isOpen={modalIsOpen}
         onClose={() => setModalIsOpen(false)}
@@ -101,7 +110,6 @@ export default function ProvidersPage() {
           console.log('✅✅✅ PROVEEDOR GUARDADO EXITOSAMENTE ✅✅✅');
           console.log('   Esperando actualización automática vía Realtime...');
           console.log('');
-          // NO llamar refetch - Realtime se encargará
         }}
       />
     </DashboardLayout>
