@@ -293,138 +293,135 @@ function FileSpreadsheetIcon({ className }: { className?: string }) {
   );
 }
 
+
 // ─── componente principal ─────────────────────────────────────────────────────
+
+type FilterMode = 'fecha' | 'estado';
+
+const STATE_OPTIONS = [
+  { value: 'recepcion',    label: 'Recepción'    },
+  { value: 'liquidacion',  label: 'Liquidación'  },
+  { value: 'auditoria',    label: 'Auditoría'    },
+  { value: 'programacion', label: 'Programación' },
+  { value: 'pagos',        label: 'Pagos'        },
+  { value: 'finiquito',    label: 'Finiquito'    },
+  { value: 'devuelto',     label: 'Devuelto'     },
+];
+
 export default function ExportPage() {
-  const [dateField, setDateField] = React.useState<DateField>('arrival_date');
-  const [dateFrom, setDateFrom]   = React.useState('');
-  const [dateTo, setDateTo]       = React.useState('');
-  const [format, setFormat]       = React.useState<'xlsx' | 'csv'>('xlsx');
-  const [loading, setLoading]     = React.useState(false);
-  const [error, setError]         = React.useState<string | null>(null);
-  const [preview, setPreview]     = React.useState<number | null>(null); // cantidad de registros encontrados
+  const [filterMode, setFilterMode]     = React.useState<FilterMode>('fecha');
+  const [dateField, setDateField]       = React.useState<DateField>('arrival_date');
+  const [dateFrom, setDateFrom]         = React.useState('');
+  const [dateTo, setDateTo]             = React.useState('');
+  const [stateFilter, setStateFilter]   = React.useState('');
+  const [format, setFormat]             = React.useState<'xlsx' | 'csv'>('xlsx');
+  const [loading, setLoading]           = React.useState(false);
+  const [error, setError]               = React.useState<string | null>(null);
+  const [preview, setPreview]           = React.useState<number | null>(null);
 
-  const canExport = dateFrom && dateTo && !loading;
+  const canExport = !loading && (
+    filterMode === 'fecha' ? (!!dateFrom && !!dateTo) : !!stateFilter
+  );
 
-  // ── consulta + cruces ──────────────────────────────────────────────────────
-  const fetchData = async (): Promise<Record<string, any>[]> => {
-    if (!dateFrom || !dateTo) throw new Error('Debes seleccionar un rango de fechas.');
-
-    const from = `${dateFrom}T00:00:00`;
-    // Usamos el inicio del día siguiente para capturar todos los registros del día "hasta"
-    const toDate = new Date(dateTo);
-    toDate.setDate(toDate.getDate() + 1);
-    const to = toDate.toISOString().split('T')[0] + 'T00:00:00';
-
-    // 1. Facturas en el rango
-    const { data: bills, error: billsErr } = await supabase
-      .from('bills')
-      .select('*')
-      .gte(dateField, from)
-      .lt(dateField, to)
-      .order(dateField, { ascending: true });
-
-    if (billsErr) throw billsErr;
-    if (!bills || bills.length === 0) return [];
-
-    // 2. Perfiles únicos necesarios (proveedores + analistas)
+  // ── enriquece bills con perfiles ──────────────────────────────────────────
+  const enrichBills = async (bills: any[]) => {
     const profileIds = new Set<string>();
     for (const b of bills) {
-      [
-        b.suppliers_id,
-        b.analyst_receptor_id,
-        b.analyst_severance,
-        b.auditor,
-        b.analyst_schedule,
-        b.analyst_paid,
-        b.analyst_settlement,
-      ].forEach(id => { if (id) profileIds.add(id); });
+      [b.suppliers_id, b.analyst_receptor_id, b.analyst_severance,
+       b.auditor, b.analyst_schedule, b.analyst_paid, b.analyst_settlement]
+        .forEach((id: string | null) => { if (id) profileIds.add(id); });
     }
-
     const profileMap: Record<string, { name: string; rif?: string }> = {};
-
     if (profileIds.size > 0) {
       const { data: profiles, error: profErr } = await supabase
-        .from('profile')
-        .select('id, name, rif')
-        .in('id', [...profileIds]);
-
+        .from('profile').select('id, name, rif').in('id', [...profileIds]);
       if (profErr) throw profErr;
-      for (const p of profiles ?? []) {
-        profileMap[p.id] = { name: p.name, rif: p.rif };
-      }
+      for (const p of profiles ?? []) profileMap[p.id] = { name: p.name, rif: p.rif };
     }
+    const getName = (id?: string | null) => id && profileMap[id] ? profileMap[id].name : '';
+    const getRIF  = (id?: string | null) => id && profileMap[id] ? (profileMap[id].rif ?? '') : '';
 
-    // 3. Enriquecer y mapear columnas
-    return bills.map(b => {
-      const getProfileName = (id?: string | null) =>
-        id && profileMap[id] ? profileMap[id].name : '';
-      const getProfileRIF = (id?: string | null) =>
-        id && profileMap[id] ? (profileMap[id].rif ?? '') : '';
-
-      return {
-        // RECEPCIÓN
-        arrival_date:       formatDate(b.arrival_date),
-        n_claim:            b.n_claim           ?? '',
-        type:               b.type              ?? '',
-        n_billing:          b.n_billing         ?? '',
-        n_control:          b.n_control         ?? '',
-        currency_type:      b.currency_type     ?? '',
-        total_billing:      b.total_billing     ?? '',
-        proveedor_nombre:   getProfileName(b.suppliers_id),
-        proveedor_rif:      getProfileRIF(b.suppliers_id),
-        receptor_nombre:    getProfileName(b.analyst_receptor_id),
-        // LIQUIDACIÓN
-        severance_date:     formatDate(b.severance_date),
-        claim_type:         b.claim_type        ?? '',
-        monto_amp:          b.monto_amp         ?? '',
-        gna:                b.gna               ?? '',
-        medical_honoraries: b.medical_honoraries ?? '',
-        clinical_services:  b.clinical_services  ?? '',
-        retention_rate:     b.retention_rate     ?? '',
-        indemnizable_rate:  b.indemnizable_rate  ?? '',
-        nomenclature_pile:  b.nomenclature_pile  ?? '',
-        liquidador_nombre:  getProfileName(b.analyst_severance),
-        // AUDITORÍA
-        audit_date:         formatDate(b.audit_date),
-        auditor_nombre:     getProfileName(b.auditor),
-        // PROGRAMACIÓN
-        programmed_date:    formatDate(b.programmed_date),
-        admin_decision:     b.admin_decision     ?? '',
-        programador_nombre: getProfileName(b.analyst_schedule),
-        // PAGO
-        paid_date:          formatDate(b.paid_date),
-        bs_amount:          b.bs_amount          ?? '',
-        tcr_amount:         b.tcr_amount         ?? '',
-        dollar_amount:      b.dollar_amount       ?? '',
-        transfer_ref:       b.transfer_ref        ?? '',
-        vertice_difference: b.vertice_difference  ?? '',
-        provider_difference:b.provider_difference ?? '',
-        pagador_nombre:     getProfileName(b.analyst_paid),
-        // FINIQUITO
-        settlement_date:    formatDate(b.settlement_date),
-        finiquito_nombre:   getProfileName(b.analyst_settlement),
-        // ESTADO
-        state:              b.state              ?? '',
-        state_sequence:     b.state_sequence     ?? '',
-        active:             b.active,
-      };
-    });
+    return bills.map(b => ({
+      arrival_date:       formatDate(b.arrival_date),
+      n_claim:            b.n_claim            ?? '',
+      type:               b.type               ?? '',
+      n_billing:          b.n_billing          ?? '',
+      n_control:          b.n_control          ?? '',
+      currency_type:      b.currency_type      ?? '',
+      total_billing:      b.total_billing      ?? '',
+      proveedor_nombre:   getName(b.suppliers_id),
+      proveedor_rif:      getRIF(b.suppliers_id),
+      receptor_nombre:    getName(b.analyst_receptor_id),
+      severance_date:     formatDate(b.severance_date),
+      claim_type:         b.claim_type         ?? '',
+      monto_amp:          b.monto_amp          ?? '',
+      gna:                b.gna                ?? '',
+      medical_honoraries: b.medical_honoraries ?? '',
+      clinical_services:  b.clinical_services  ?? '',
+      retention_rate:     b.retention_rate     ?? '',
+      indemnizable_rate:  b.indemnizable_rate  ?? '',
+      nomenclature_pile:  b.nomenclature_pile  ?? '',
+      liquidador_nombre:  getName(b.analyst_severance),
+      audit_date:         formatDate(b.audit_date),
+      auditor_nombre:     getName(b.auditor),
+      programmed_date:    formatDate(b.programmed_date),
+      admin_decision:     b.admin_decision      ?? '',
+      programador_nombre: getName(b.analyst_schedule),
+      paid_date:          formatDate(b.paid_date),
+      bs_amount:          b.bs_amount           ?? '',
+      tcr_amount:         b.tcr_amount          ?? '',
+      dollar_amount:      b.dollar_amount        ?? '',
+      transfer_ref:       b.transfer_ref         ?? '',
+      vertice_difference: b.vertice_difference   ?? '',
+      provider_difference:b.provider_difference  ?? '',
+      pagador_nombre:     getName(b.analyst_paid),
+      settlement_date:    formatDate(b.settlement_date),
+      finiquito_nombre:   getName(b.analyst_settlement),
+      state:              b.state               ?? '',
+      state_sequence:     b.state_sequence      ?? '',
+      active:             b.active,
+    }));
   };
 
-  // ── previsualizar cantidad ─────────────────────────────────────────────────
-  const handlePreview = async () => {
-    if (!dateFrom || !dateTo) return;
-    setError(null);
-    try {
+  // ── consulta principal ─────────────────────────────────────────────────────
+  const fetchData = async (): Promise<Record<string, any>[]> => {
+    let query = supabase.from('bills').select('*');
+
+    if (filterMode === 'fecha') {
+      if (!dateFrom || !dateTo) throw new Error('Debes seleccionar un rango de fechas.');
       const from = `${dateFrom}T00:00:00`;
       const toDate = new Date(dateTo);
       toDate.setDate(toDate.getDate() + 1);
       const to = toDate.toISOString().split('T')[0] + 'T00:00:00';
-      const { count, error: e } = await supabase
-        .from('bills')
-        .select('id', { count: 'exact', head: true })
-        .gte(dateField, from)
-        .lt(dateField, to);
+      query = query.gte(dateField, from).lt(dateField, to).order(dateField, { ascending: true });
+    } else {
+      if (!stateFilter) throw new Error('Debes seleccionar un estado.');
+      query = query.eq('state_sequence', stateFilter).order('arrival_date', { ascending: true });
+    }
+
+    const { data: bills, error: billsErr } = await query;
+    if (billsErr) throw billsErr;
+    if (!bills || bills.length === 0) return [];
+    return enrichBills(bills);
+  };
+
+  // ── previsualizar cantidad ─────────────────────────────────────────────────
+  const handlePreview = async () => {
+    setError(null);
+    try {
+      let query = supabase.from('bills').select('id', { count: 'exact', head: true });
+      if (filterMode === 'fecha') {
+        if (!dateFrom || !dateTo) return;
+        const from = `${dateFrom}T00:00:00`;
+        const toDate = new Date(dateTo);
+        toDate.setDate(toDate.getDate() + 1);
+        const to = toDate.toISOString().split('T')[0] + 'T00:00:00';
+        query = query.gte(dateField, from).lt(dateField, to);
+      } else {
+        if (!stateFilter) return;
+        query = query.eq('state_sequence', stateFilter);
+      }
+      const { count, error: e } = await query;
       if (e) throw e;
       setPreview(count ?? 0);
     } catch (err: any) {
@@ -434,9 +431,10 @@ export default function ExportPage() {
 
   React.useEffect(() => {
     setPreview(null);
-    if (dateFrom && dateTo) handlePreview();
+    const ready = filterMode === 'fecha' ? (!!dateFrom && !!dateTo) : !!stateFilter;
+    if (ready) handlePreview();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateField, dateFrom, dateTo]);
+  }, [filterMode, dateField, dateFrom, dateTo, stateFilter]);
 
   // ── exportar ───────────────────────────────────────────────────────────────
   const handleExport = async () => {
@@ -446,18 +444,19 @@ export default function ExportPage() {
     try {
       const rows = await fetchData();
       if (rows.length === 0) {
-        setError('No se encontraron facturas en el rango seleccionado.');
+        setError('No se encontraron facturas con ese filtro.');
         return;
       }
-
-      const dateLabel = DATE_OPTIONS.find(o => o.value === dateField)?.label ?? dateField;
-      const filename  = `facturas_${dateLabel.replace(/\s+/g, '_')}_${dateFrom}_${dateTo}.${format}`;
-
-      if (format === 'csv') {
-        downloadCSV(rows, filename);
+      let filename = '';
+      if (filterMode === 'fecha') {
+        const dateLabel = DATE_OPTIONS.find(o => o.value === dateField)?.label ?? dateField;
+        filename = `facturas_${dateLabel.replace(/\s+/g, '_')}_${dateFrom}_${dateTo}.${format}`;
       } else {
-        await downloadXLSX(rows, filename);
+        const stateLabel = STATE_OPTIONS.find(o => o.value === stateFilter)?.label ?? stateFilter;
+        filename = `facturas_estado_${stateLabel.replace(/\s+/g, '_')}.${format}`;
       }
+      if (format === 'csv') downloadCSV(rows, filename);
+      else await downloadXLSX(rows, filename);
     } catch (err: any) {
       setError('Error al exportar: ' + err.message);
     } finally {
@@ -466,93 +465,95 @@ export default function ExportPage() {
   };
 
   // ─── UI ───────────────────────────────────────────────────────────────────
-  const selectedDateLabel = DATE_OPTIONS.find(o => o.value === dateField)?.label ?? '';
+  const selectedDateLabel  = DATE_OPTIONS.find(o => o.value === dateField)?.label ?? '';
+  const selectedStateLabel = STATE_OPTIONS.find(o => o.value === stateFilter)?.label ?? '—';
 
   return (
     <DashboardLayout title="Exportar Facturas" returnTo="/bills">
       <div className="space-y-6">
 
-        {/* ── Formulario arriba, ancho completo ── */}
+        {/* ── Formulario ── */}
         <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm overflow-hidden">
-
-          {/* Header */}
           <div className="bg-[#1a56ff] px-6 py-5 flex items-center gap-3">
             <FileSpreadsheetIcon className="size-6 text-white/80 shrink-0" />
             <div>
               <h2 className="text-white font-semibold text-base leading-tight">Exportación de Datos</h2>
               <p className="text-white/70 text-xs mt-0.5">
-                Filtra facturas por rango de fecha y descarga el reporte
+                Filtra facturas por rango de fecha o por estado y descarga el reporte
               </p>
             </div>
           </div>
 
-          <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-end">
+          <div className="p-6 space-y-5">
 
-              {/* Tipo de fecha */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wide">
-                  Tipo de fecha
-                </label>
-                <select
-                  value={dateField}
-                  onChange={e => setDateField(e.target.value as DateField)}
-                  className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-800 focus:outline-none focus:ring-2 focus:ring-[#1a56ff]/40 focus:border-[#1a56ff] transition"
+            {/* Toggle modo */}
+            <div className="flex gap-1 p-1 bg-neutral-100 rounded-lg w-fit">
+              {([
+                { value: 'fecha',  label: '📅 Por fecha'  },
+                { value: 'estado', label: '🏷️ Por estado' },
+              ] as { value: FilterMode; label: string }[]).map(m => (
+                <button
+                  key={m.value}
+                  onClick={() => { setFilterMode(m.value); setPreview(null); setError(null); }}
+                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    filterMode === m.value
+                      ? 'bg-white text-neutral-900 shadow-sm'
+                      : 'text-neutral-500 hover:text-neutral-700'
+                  }`}
                 >
-                  {DATE_OPTIONS.map(o => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Desde */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wide">
-                  Desde
-                </label>
-                <input
-                  type="date"
-                  value={dateFrom}
-                  max={dateTo || undefined}
-                  onChange={e => setDateFrom(e.target.value)}
-                  className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-800 focus:outline-none focus:ring-2 focus:ring-[#1a56ff]/40 focus:border-[#1a56ff] transition"
-                />
-              </div>
-
-              {/* Hasta */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wide">
-                  Hasta
-                </label>
-                <input
-                  type="date"
-                  value={dateTo}
-                  min={dateFrom || undefined}
-                  onChange={e => setDateTo(e.target.value)}
-                  className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-800 focus:outline-none focus:ring-2 focus:ring-[#1a56ff]/40 focus:border-[#1a56ff] transition"
-                />
-              </div>
+                  {m.label}
+                </button>
+              ))}
             </div>
 
-            {/* Formato + botón en la misma fila */}
-            <div className="mt-5 flex flex-col sm:flex-row items-stretch sm:items-end gap-4">
+            {/* Campos según modo */}
+            {filterMode === 'fecha' ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wide">Tipo de fecha</label>
+                  <select value={dateField} onChange={e => setDateField(e.target.value as DateField)}
+                    className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-800 focus:outline-none focus:ring-2 focus:ring-[#1a56ff]/40 focus:border-[#1a56ff] transition">
+                    {DATE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wide">Desde</label>
+                  <input type="date" value={dateFrom} max={dateTo || undefined}
+                    onChange={e => setDateFrom(e.target.value)}
+                    className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-800 focus:outline-none focus:ring-2 focus:ring-[#1a56ff]/40 focus:border-[#1a56ff] transition" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wide">Hasta</label>
+                  <input type="date" value={dateTo} min={dateFrom || undefined}
+                    onChange={e => setDateTo(e.target.value)}
+                    className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-800 focus:outline-none focus:ring-2 focus:ring-[#1a56ff]/40 focus:border-[#1a56ff] transition" />
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wide">Estado de la factura</label>
+                  <select value={stateFilter} onChange={e => setStateFilter(e.target.value)}
+                    className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-800 focus:outline-none focus:ring-2 focus:ring-[#1a56ff]/40 focus:border-[#1a56ff] transition">
+                    <option value="">Seleccionar estado...</option>
+                    {STATE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+              </div>
+            )}
 
-              {/* Formato */}
+            {/* Formato + botón */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-4">
               <div className="space-y-1.5 flex-1">
-                <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wide">
-                  Formato de descarga
-                </label>
+                <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wide">Formato de descarga</label>
                 <div className="grid grid-cols-2 gap-2">
                   {(['xlsx', 'csv'] as const).map(f => (
-                    <button
-                      key={f}
-                      onClick={() => setFormat(f)}
+                    <button key={f} onClick={() => setFormat(f)}
                       className={`py-2.5 rounded-lg border text-sm font-medium transition-all flex items-center justify-center gap-2 ${
                         format === f
                           ? 'bg-[#1a56ff] border-[#1a56ff] text-white shadow-sm'
                           : 'border-neutral-200 text-neutral-600 hover:bg-neutral-50'
-                      }`}
-                    >
+                      }`}>
                       <span className="text-base">{f === 'xlsx' ? '📊' : '📄'}</span>
                       <span>{f === 'xlsx' ? 'Excel (.xlsx)' : 'CSV (.csv)'}</span>
                     </button>
@@ -560,21 +561,15 @@ export default function ExportPage() {
                 </div>
               </div>
 
-              {/* Botón exportar */}
               <div className="flex flex-col gap-2 sm:w-56">
-                {/* Preview / error inline pequeño */}
-                {preview !== null && dateFrom && dateTo && (
-                  <p className={`text-xs text-center font-medium ${
-                    preview === 0 ? 'text-amber-600' : 'text-emerald-600'
-                  }`}>
+                {preview !== null && (
+                  <p className={`text-xs text-center font-medium ${preview === 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
                     {preview === 0
-                      ? '⚠️ Sin resultados en ese rango'
+                      ? '⚠️ Sin resultados'
                       : `✅ ${preview.toLocaleString()} factura${preview !== 1 ? 's' : ''} encontrada${preview !== 1 ? 's' : ''}`}
                   </p>
                 )}
-                {error && (
-                  <p className="text-xs text-center text-red-500">❌ {error}</p>
-                )}
+                {error && <p className="text-xs text-center text-red-500">❌ {error}</p>}
                 <button
                   onClick={handleExport}
                   disabled={!canExport || preview === 0}
@@ -582,8 +577,7 @@ export default function ExportPage() {
                     canExport && preview !== 0
                       ? 'bg-[#1a56ff] text-white hover:bg-[#1446e0] shadow-md hover:shadow-lg active:scale-[0.98]'
                       : 'bg-neutral-100 text-neutral-400 cursor-not-allowed'
-                  }`}
-                >
+                  }`}>
                   {loading ? (
                     <>
                       <svg className="animate-spin size-4" viewBox="0 0 24 24" fill="none">
@@ -604,21 +598,24 @@ export default function ExportPage() {
           </div>
         </div>
 
-        {/* ── Dos cards informativas abajo ── */}
+        {/* ── Cards informativas ── */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-          {/* Resumen de selección */}
+          {/* Resumen */}
           <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-5 space-y-4">
-            <h3 className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">
-              Resumen de exportación
-            </h3>
+            <h3 className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">Resumen de exportación</h3>
             <div className="space-y-0">
-              {[
-                { label: 'Tipo de fecha', value: selectedDateLabel },
-                { label: 'Desde',         value: dateFrom || '—'   },
-                { label: 'Hasta',         value: dateTo   || '—'   },
+              {(filterMode === 'fecha' ? [
+                { label: 'Modo',          value: 'Por fecha'          },
+                { label: 'Tipo de fecha', value: selectedDateLabel    },
+                { label: 'Desde',         value: dateFrom   || '—'   },
+                { label: 'Hasta',         value: dateTo     || '—'   },
                 { label: 'Formato',       value: format.toUpperCase() },
-              ].map(row => (
+              ] : [
+                { label: 'Modo',    value: 'Por estado'          },
+                { label: 'Estado',  value: selectedStateLabel    },
+                { label: 'Formato', value: format.toUpperCase()  },
+              ]).map(row => (
                 <div key={row.label} className="flex justify-between items-center py-2.5 border-b border-neutral-100 last:border-0">
                   <span className="text-sm text-neutral-500">{row.label}</span>
                   <span className="text-sm font-semibold text-neutral-800 text-right max-w-[55%]">{row.value}</span>
@@ -638,9 +635,7 @@ export default function ExportPage() {
 
           {/* Columnas incluidas */}
           <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-5 space-y-3">
-            <h3 className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">
-              Columnas incluidas
-            </h3>
+            <h3 className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">Columnas incluidas</h3>
             <div className="space-y-0">
               {[
                 { label: 'Recepción',    count: 10, color: 'bg-blue-500'    },
@@ -664,7 +659,6 @@ export default function ExportPage() {
           </div>
 
         </div>
-
       </div>
     </DashboardLayout>
   );
