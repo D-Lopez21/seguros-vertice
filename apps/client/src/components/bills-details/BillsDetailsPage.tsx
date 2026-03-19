@@ -14,7 +14,7 @@ import type {
   SectionId,
 } from './interfaces';
 import { useGetAllUsers } from '../../hooks/useGetAllUsers';
-import { useGetAllBills } from '../../hooks/useGetAllBills'; // ✅ AGREGADO
+import { useGetAllBills } from '../../hooks/useGetAllBills';
 import { useAuth } from '../../hooks/useAuth';
 import FinishSection from './FinishSection';
 import PaymentSection from './PaymentSection';
@@ -37,7 +37,7 @@ export default function BillsDetailsPage({
   const [activeSection, setActiveSection] = React.useState<SectionId>('recepcion');
   const { users: allUsers } = useGetAllUsers();
   const { user, isAdmin } = useAuth();
-  const { providers } = useGetAllBills(); // ✅ AGREGADO — misma fuente que BillingPage
+  const { providers } = useGetAllBills();
 
   const roles = user?.profile?.roles ?? [];
   const isProveedor = roles.includes('proveedor');
@@ -255,6 +255,7 @@ export default function BillsDetailsPage({
           return;
         }
 
+        // Validación: n_billing único por proveedor
         let dupQuery = supabase
           .from('bills')
           .select('id')
@@ -270,6 +271,25 @@ export default function BillsDetailsPage({
 
         if (duplicates && duplicates.length > 0) {
           showModal(`El número de factura "${sectionData?.n_billing}" ya existe para este proveedor.`, 'error');
+          setLoading(false);
+          return;
+        }
+
+        // ✅ Validación: n_claim único globalmente
+        let claimQuery = supabase
+          .from('bills')
+          .select('id')
+          .eq('n_claim', sectionData?.n_claim);
+
+        if (!isCreating && billId) {
+          claimQuery = claimQuery.neq('id', billId);
+        }
+
+        const { data: claimDuplicates, error: claimError } = await claimQuery.limit(1);
+        if (claimError) throw claimError;
+
+        if (claimDuplicates && claimDuplicates.length > 0) {
+          showModal(`El número de siniestro "${sectionData?.n_claim}" ya está registrado en otra factura.`, 'error');
           setLoading(false);
           return;
         }
@@ -424,7 +444,7 @@ export default function BillsDetailsPage({
           <ReceptionSection
             data={recepcionData}
             setData={setRecepcionData}
-            providers={providers} // ✅ viene de useGetAllBills, misma fuente
+            providers={providers}
             allUsers={allUsers}
             onSave={(sectionData: any) => handleSaveSection('recepcion', sectionData)}
             isNewBill={!billExists}
