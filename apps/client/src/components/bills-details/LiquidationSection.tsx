@@ -5,7 +5,7 @@ import Modal from './BillModal';
 const CLAIM_TYPES = [
   'AMBULATORIO', 'APS', 'CARTA AVAL', 'FARMACIA', 'HOSPITALIZACION',
   'JORNADA', 'LABORATORIO', 'ONCOLOGICO', 'TRASLADO EN AMBULANCIA',
-  'HOME CARE', 'PREPAGO', 'JUNTA MEDICA'
+  'HOME CARE', 'PREPAGO', 'JUNTA MEDICA', 'CAPITADO'
 ];
 
 export default function LiquidationSection({
