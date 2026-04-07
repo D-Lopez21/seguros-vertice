@@ -12,7 +12,7 @@ export const useUpdatePassword = () => {
     setError(null);
 
     try {
-      const { data, error: rpcError } = await supabase.rpc(
+      const { error: rpcError } = await supabase.rpc(
         'user_self_update_password',
         {
           new_password: newPassword,
