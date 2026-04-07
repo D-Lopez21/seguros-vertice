@@ -51,8 +51,7 @@ export function useGetAllUsers() {
       setUsers((prev) => prev.filter((u) => u.id !== id));
       return true;
     } catch (err: any) {
-      alert('Error al desactivar usuario: ' + err.message);
-      return false;
+      throw err;
     }
   };
 
@@ -98,8 +97,7 @@ export function useGetAllUsers() {
       setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, ...profileUpdates, roles: roles ?? u.roles } : u)));
       return true;
     } catch (err: any) {
-      alert('Error al actualizar usuario: ' + err.message);
-      return false;
+      throw err;
     }
   };
 

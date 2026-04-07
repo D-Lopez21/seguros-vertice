@@ -1,7 +1,8 @@
 import React from 'react';
-import { Button, DashboardLayout } from './common';
+import { Button, DashboardLayout, ConfirmDialog } from './common';
 import { PlusIcon, DownloadIcon } from './icons';
 import BillsTable from './BillsTable';
+import BillModal from './bills-details/BillModal';
 import { useNavigate } from 'react-router';
 import { useGetAllBills } from '../hooks/useGetAllBills';
 import { useAuth } from '../hooks/useAuth';
@@ -16,6 +17,13 @@ export default function BillingPage() {
 
   const [searchTerm, setSearchTerm] = React.useState('');
   const [filterType, setFilterType] = React.useState<FilterType>('claim');
+
+  const [confirmDialog, setConfirmDialog] = React.useState<{ isOpen: boolean; id: string; isLoading: boolean }>({
+    isOpen: false, id: '', isLoading: false,
+  });
+  const [notification, setNotification] = React.useState<{ isOpen: boolean; message: string; type: 'error' | 'success' | 'warning' | 'info' }>({
+    isOpen: false, message: '', type: 'error',
+  });
 
   const roles = user?.profile?.roles ?? [];
   const isProvider = roles.includes('proveedor');
@@ -34,6 +42,32 @@ export default function BillingPage() {
   const handleClearFilters = () => {
     setSearchTerm('');
     setFilterType('claim');
+  };
+
+  const handleDeleteRequest = (id: string) => {
+    setConfirmDialog({ isOpen: true, id, isLoading: false });
+  };
+
+  const handleConfirmDelete = async () => {
+    setConfirmDialog((prev) => ({ ...prev, isLoading: true }));
+    try {
+      const success = await deleteBill(confirmDialog.id);
+      setConfirmDialog({ isOpen: false, id: '', isLoading: false });
+      if (!success) {
+        setNotification({
+          isOpen: true,
+          message: 'Error al eliminar la factura. Inténtalo de nuevo.',
+          type: 'error',
+        });
+      }
+    } catch (err: any) {
+      setConfirmDialog({ isOpen: false, id: '', isLoading: false });
+      setNotification({
+        isOpen: true,
+        message: err.message || 'Error al eliminar la factura. Inténtalo de nuevo.',
+        type: 'error',
+      });
+    }
   };
 
   return (
@@ -119,9 +153,24 @@ export default function BillingPage() {
         searchTerm={searchTerm}
         filterType={filterType}
         getProviderName={getProviderName}
-        onDelete={(id) => {
-          if (window.confirm('¿Eliminar esta factura?')) deleteBill(id);
-        }}
+        onDelete={handleDeleteRequest}
+      />
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ isOpen: false, id: '', isLoading: false })}
+        onConfirm={handleConfirmDelete}
+        isLoading={confirmDialog.isLoading}
+        title="Eliminar factura"
+        message="¿Seguro que deseas eliminar esta factura? Esta acción no se puede deshacer."
+        confirmLabel="Eliminar"
+      />
+
+      <BillModal
+        isOpen={notification.isOpen}
+        onClose={() => setNotification((prev) => ({ ...prev, isOpen: false }))}
+        message={notification.message}
+        type={notification.type}
       />
     </DashboardLayout>
   );

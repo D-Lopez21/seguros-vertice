@@ -1,8 +1,9 @@
 import React from 'react';
-import { Button, DashboardLayout } from './common';
+import { Button, DashboardLayout, ConfirmDialog } from './common';
 import { PlusIcon } from './icons';
 import UsersTable from './UsersTable';
 import UserRegistrationModal from './UserRegistrationModal';
+import BillModal from './bills-details/BillModal';
 import { useGetAllUsers } from '../hooks/useGetAllUsers';
 import type { Profile } from '../contexts/AuthContext';
 
@@ -16,7 +17,13 @@ export default function UsersPage() {
   const [filterType, setFilterType] = React.useState<'name' | 'role'>('name');
   const [page, setPage] = React.useState(0);
 
-  // Resetear a página 0 cuando cambia la búsqueda
+  const [confirmDialog, setConfirmDialog] = React.useState<{ isOpen: boolean; id: string; name: string; isLoading: boolean }>({
+    isOpen: false, id: '', name: '', isLoading: false,
+  });
+  const [notification, setNotification] = React.useState<{ isOpen: boolean; message: string; type: 'error' | 'success' | 'warning' | 'info' }>({
+    isOpen: false, message: '', type: 'error',
+  });
+
   const handleSearchChange = (value: string) => {
     setSearchTerm(value);
     setPage(0);
@@ -27,9 +34,36 @@ export default function UsersPage() {
     setModalIsOpen(true);
   };
 
-  const handleDelete = async (id: string, name: string) => {
-    if (window.confirm(`¿Seguro que deseas eliminar a ${name}?`)) {
-      await deleteUser(id);
+  const handleDelete = (id: string, name: string) => {
+    setConfirmDialog({ isOpen: true, id, name, isLoading: false });
+  };
+
+  const handleConfirmDelete = async () => {
+    setConfirmDialog((prev) => ({ ...prev, isLoading: true }));
+    try {
+      await deleteUser(confirmDialog.id);
+      setConfirmDialog({ isOpen: false, id: '', name: '', isLoading: false });
+    } catch (err: any) {
+      setConfirmDialog({ isOpen: false, id: '', name: '', isLoading: false });
+      setNotification({
+        isOpen: true,
+        message: err.message || 'Error al eliminar el usuario. Inténtalo de nuevo.',
+        type: 'error',
+      });
+    }
+  };
+
+  const handleUpdate = async (id: string, data: any): Promise<boolean> => {
+    try {
+      await updateUser(id, data);
+      return true;
+    } catch (err: any) {
+      setNotification({
+        isOpen: true,
+        message: err.message || 'Error al actualizar el usuario. Inténtalo de nuevo.',
+        type: 'error',
+      });
+      return false;
     }
   };
 
@@ -78,8 +112,25 @@ export default function UsersPage() {
         isOpen={modalIsOpen}
         onClose={() => setModalIsOpen(false)}
         userToEdit={userToEdit}
-        onUpdate={updateUser}
+        onUpdate={handleUpdate}
         onRefresh={refetch}
+      />
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ isOpen: false, id: '', name: '', isLoading: false })}
+        onConfirm={handleConfirmDelete}
+        isLoading={confirmDialog.isLoading}
+        title="Eliminar usuario"
+        message={`¿Seguro que deseas eliminar a ${confirmDialog.name}? Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+      />
+
+      <BillModal
+        isOpen={notification.isOpen}
+        onClose={() => setNotification((prev) => ({ ...prev, isOpen: false }))}
+        message={notification.message}
+        type={notification.type}
       />
     </DashboardLayout>
   );

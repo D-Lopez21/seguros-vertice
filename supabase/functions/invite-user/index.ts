@@ -53,7 +53,6 @@ Deno.serve(async (req) => {
     if (authError) throw authError;
 
     const userId = authData.user.id;
-    console.log('✅ Invitación enviada a:', email, 'ID:', userId);
 
     // 3. Buscar IDs de los roles seleccionados
     const { data: roleData, error: roleError } = await supabase
@@ -62,7 +61,6 @@ Deno.serve(async (req) => {
       .in('name', roles);
 
     if (roleError) throw roleError;
-    console.log('✅ Roles encontrados:', roleData);
 
     // 4. Insertar relaciones en user_roles (evitando duplicados)
     if (roleData && roleData.length > 0) {
@@ -80,7 +78,6 @@ Deno.serve(async (req) => {
         });
 
       if (userRolesError) throw userRolesError;
-      console.log('✅ Roles asignados correctamente (sin duplicados)');
     }
 
     // 5. Si active es false, actualizar el perfil
@@ -94,7 +91,7 @@ Deno.serve(async (req) => {
     );
 
   } catch (error: any) {
-    console.error('❌ Error:', error.message);
+    console.error('Error:', error.message);
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

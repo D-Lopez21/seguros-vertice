@@ -25,7 +25,6 @@ async function fetchAllRows<T>(query: any): Promise<T[]> {
     const { data, error } = await query.range(from, from + batchSize - 1);
     if (error) throw error;
     all = [...all, ...(data || [])];
-    console.log(`📦 Lote recibido: ${data?.length ?? 0} registros (total acumulado: ${all.length})`);
     if ((data?.length ?? 0) < batchSize) break;
     from += batchSize;
   }
@@ -41,42 +40,25 @@ export function useGetAllBills() {
   const [loading, setLoading] = React.useState(cachedBills.length === 0);
   const [error, setError] = React.useState<string | null>(null);
 
-  React.useEffect(() => {
-    if (user) {
-      console.log('👤 Usuario actual:', {
-        id: user.id,
-        email: user.email,
-        roles: user.profile?.roles,
-        suppliers_id: user.profile?.suppliers_id,
-        name: user.profile?.name
-      });
-    }
-  }, [user]);
-
   const refetch = React.useCallback(async (showLoader = false) => {
     if (showLoader) setLoading(true);
     setError(null);
     try {
-      console.log("🔄 Sincronizando datos...");
       let query = supabase.from('bills').select('*');
       const roles = user?.profile?.roles ?? [];
       const isProveedor = roles.includes('proveedor');
       if (isProveedor && user) {
         const providerIdentifier = user.profile?.suppliers_id || user.id;
-        console.log('🔒 FILTRO APLICADO - Proveedor ID:', providerIdentifier);
         query = query.eq('suppliers_id', providerIdentifier);
-      } else {
-        console.log('🔓 Sin filtro - Mostrando todas las facturas');
       }
       query = query.order('arrival_date', { ascending: false });
 
-      // ✅ Usa fetchAllRows para superar el límite de 1000 filas de Supabase
+      // Usa fetchAllRows para superar el límite de 1000 filas de Supabase
       const data = await fetchAllRows<Bill>(query);
       cachedBills = data;
       setBills(cachedBills);
-      console.log(`✅ Refetch completado: ${cachedBills.length} facturas`);
     } catch (err: any) {
-      console.error("❌ Error en refetch:", err.message);
+      console.error('Error en refetch:', err.message);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -94,7 +76,6 @@ export function useGetAllBills() {
         const isProveedor = roles.includes('proveedor');
         if (isProveedor && user) {
           const providerIdentifier = user.profile?.suppliers_id || user.id;
-          console.log('🔒 Aplicando filtro en carga inicial...');
           billsQuery = billsQuery.eq('suppliers_id', providerIdentifier);
         }
         billsQuery = billsQuery.order('arrival_date', { ascending: false });
@@ -131,7 +112,6 @@ export function useGetAllBills() {
           setBills(cachedBills);
           setProviders(cachedProviders);
           setError(null);
-          console.log(`✅ Carga inicial completada: ${cachedBills.length} facturas, ${cachedProviders.length} proveedores`);
         }
       } catch (err: any) {
         if (isMounted) setError(err.message);

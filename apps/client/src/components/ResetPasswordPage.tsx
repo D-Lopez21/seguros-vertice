@@ -59,7 +59,6 @@ export default function ResetPassword() {
           typeof err?.message === 'string' && err.message.toLowerCase().includes('aborted');
 
         if (isAbort) {
-          console.log('ℹ️ Validación de sesión abortada (AbortError controlado en reset-password)');
           setValidatingToken(false);
           return;
         }
@@ -71,8 +70,6 @@ export default function ResetPassword() {
 
     // Escuchar cambios de estado - AQUÍ DETECTAMOS EL USER_UPDATED Y REDIRIGIMOS
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('🔔 Auth event:', event);
-      
       if (session && isMounted && (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN')) {
         setIsReady(true);
         setValidatingToken(false);
@@ -80,27 +77,14 @@ export default function ResetPassword() {
       
       // Cuando detectamos USER_UPDATED, significa que la contraseña se actualizó exitosamente
       if (event === 'USER_UPDATED' && session && isMounted) {
-        console.log('✅ Contraseña actualizada exitosamente (USER_UPDATED)');
-        console.log('🔄 Actualizando perfil y redirigiendo...');
-        
-        // Actualizar el perfil
         if (session.user?.id) {
           supabase
             .from('profile')
             .update({ password_change_required: false })
-            .eq('id', session.user.id)
-            .then((result) => {
-              if (result.error) {
-                console.warn('⚠️ Error al actualizar perfil:', result.error.message);
-              } else {
-                console.log('✅ Perfil actualizado');
-              }
-            });
+            .eq('id', session.user.id);
         }
-        
-        // Redirigir después de 1 segundo
+
         setTimeout(() => {
-          console.log('🚀 Redirigiendo al home...');
           window.location.href = '/';
         }, 1000);
       }
@@ -130,20 +114,14 @@ export default function ResetPassword() {
     setLoading(true);
     setError(null);
 
-    console.log('🔄 Iniciando actualización de contraseña...');
-
     try {
       // Llamar a updateUser - NO esperamos la respuesta
       // porque onAuthStateChange manejará el evento USER_UPDATED
-      console.log('📤 Llamando a updateUser...');
-      
       supabase.auth.updateUser({
         password: password,
       }).then((result) => {
-        console.log('📥 Respuesta de updateUser:', result);
-        
         if (result.error) {
-          console.error('❌ Error al actualizar contraseña:', result.error);
+          console.error('Error al actualizar contraseña:', result.error);
           setError(result.error.message);
           setLoading(false);
         }
@@ -155,18 +133,17 @@ export default function ResetPassword() {
           typeof err?.message === 'string' && err.message.toLowerCase().includes('aborted');
 
         if (isAbort) {
-          console.log('ℹ️ Petición de updateUser abortada (AbortError controlado)', err);
           setLoading(false);
           return;
         }
 
-        console.error('❌ Error en updateUser:', err);
+        console.error('Error en updateUser:', err);
         setError(err?.message || 'Error al actualizar la contraseña');
         setLoading(false);
       });
-      
+
     } catch (err: any) {
-      console.error('❌ Error en el proceso:', err);
+      console.error('Error en el proceso:', err);
       setError(err.message || 'Ocurrió un error al actualizar la contraseña');
       setLoading(false);
     }

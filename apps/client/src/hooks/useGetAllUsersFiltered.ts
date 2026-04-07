@@ -65,8 +65,6 @@ export function useGetAllUsersFiltered(filterRole: SimulatedRolesEnum) {
         (payload) => {
           if (!isMounted) return;
 
-          console.log('👤 User changed:', payload.eventType, filterRole);
-
           // Actualización optimista
           if (payload.eventType === 'INSERT') {
             setUsers((prev) => [...prev, payload.new as Profile].sort((a, b) => 

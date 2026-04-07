@@ -56,7 +56,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .single();
 
       if (error) {
-        console.warn('Perfil no encontrado:', error.message);
         return currentUser;
       }
 
@@ -92,7 +91,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (lastHeartbeat) {
       const timeSinceLastHeartbeat = Date.now() - parseInt(lastHeartbeat);
       if (timeSinceLastHeartbeat > HEARTBEAT_TIMEOUT) {
-        console.log('⚠️ Pestaña anterior está muerta');
         return true;
       }
     }
@@ -117,7 +115,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         localStorage.setItem(TAB_TIMESTAMP_KEY, now.toString());
       }
 
-      console.log('✅ Esta pestaña tomó el control:', TAB_ID);
       return true;
     }
     return false;
@@ -130,7 +127,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // Caso especial: flujo de recuperación / invitación.
     // Permitimos cambiar de usuario sin forzar redirección al sign-in.
     if (isResetPasswordRoute && storedUserId && storedUserId !== currentUserId) {
-      console.warn('ℹ️ Cambio de usuario permitido en /reset-password');
       localStorage.clear();
       sessionStorage.clear();
       localStorage.setItem('current_user_id', currentUserId);
@@ -138,7 +134,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     if (storedUserId && storedUserId !== currentUserId) {
-      console.warn('⚠️ Detectado cambio de usuario. Cerrando sesión...');
       localStorage.clear();
       sessionStorage.clear();
       await supabase.auth.signOut();
@@ -173,10 +168,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     supabase.auth.onAuthStateChange(async (event, currentSession) => {
-      console.log('🔔 Auth event:', event);
-
       if (event === 'SIGNED_IN' && hasSessionRef.current) {
-        console.log('ℹ️ SIGNED_IN ignorado - sesión ya activa');
         return;
       }
 
@@ -214,8 +206,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     localStorage.setItem(ACTIVE_TAB_KEY, TAB_ID);
     localStorage.setItem(TAB_HEARTBEAT_KEY, now.toString());
     localStorage.setItem(TAB_TIMESTAMP_KEY, now.toString());
-
-    console.log('🔨 FORZANDO esta pestaña como activa:', TAB_ID);
 
     isActiveTabRef.current = true;
     setIsActiveTab(true);
@@ -255,7 +245,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         checkActiveTabIntervalRef.current = window.setInterval(() => {
           const activeTabId = localStorage.getItem(ACTIVE_TAB_KEY);
           if (activeTabId !== TAB_ID && isActiveTabRef.current) {
-            console.log('⚠️ Otra pestaña tomó el control');
             isActiveTabRef.current = false;
             setIsActiveTab(false);
             if (heartbeatIntervalRef.current) {
@@ -266,14 +255,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }, HEARTBEAT_INTERVAL);
 
       } else {
-        console.warn('⚠️ Esta pestaña NO es activa. Esperando...');
         setIsLoading(false);
 
         checkActiveTabIntervalRef.current = window.setInterval(() => {
           if (!isActiveTabRef.current && canBeActiveTab()) {
             const gotControl = tryTakeControl();
             if (gotControl) {
-              console.log('✅ Tomando control de pestaña inactiva');
               isActiveTabRef.current = true;
               setIsActiveTab(true);
               heartbeatIntervalRef.current = window.setInterval(sendHeartbeat, HEARTBEAT_INTERVAL);
@@ -288,7 +275,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (e.key === ACTIVE_TAB_KEY) {
         const newActiveTab = e.newValue;
         if (newActiveTab !== TAB_ID && newActiveTab !== null && isActiveTabRef.current) {
-          console.log('⚠️ Otra pestaña tomó el control vía storage');
           isActiveTabRef.current = false;
           setIsActiveTab(false);
           if (heartbeatIntervalRef.current) {

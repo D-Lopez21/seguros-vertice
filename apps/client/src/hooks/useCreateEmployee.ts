@@ -64,11 +64,10 @@ export const useCreateEmployee = () => {
       }
 
       const data = await res.json();
-      console.log('✅ Usuario invitado exitosamente:', data);
       return data;
 
     } catch (err: any) {
-      console.error('❌ Error:', err);
+      console.error('Error invitando usuario:', err);
       const errorMsg = err.message || 'Error desconocido';
       setError(errorMsg);
       return null;

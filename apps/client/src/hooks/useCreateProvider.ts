@@ -5,7 +5,6 @@ export const useCreateProvider = () => {
     fullName: string;
     rif: string;
   }) => {
-    console.log('estoy aqui', data)
     const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
     const response = await fetch(
       `${import.meta.env.VITE_SUPABASE_FUNCTIONS_URL}/invite-supplier`,

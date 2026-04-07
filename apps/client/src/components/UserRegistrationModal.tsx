@@ -26,6 +26,7 @@ const ROLES = [
 export default function UserRegistrationModal({ isOpen, onClose, userToEdit, onUpdate, onRefresh }: Props) {
 
   const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
   const [name, setName] = React.useState('');
   const [email, setEmail] = React.useState('');
   const [roles, setRoles] = React.useState<string[]>(['recepcion']);
@@ -43,6 +44,7 @@ export default function UserRegistrationModal({ isOpen, onClose, userToEdit, onU
       setRoles(['recepcion']);
       setActive(true);
     }
+    setError(null);
   }, [userToEdit, isOpen]);
 
   const toggleRole = (value: string) => {
@@ -55,9 +57,10 @@ export default function UserRegistrationModal({ isOpen, onClose, userToEdit, onU
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
 
     if (roles.length === 0) {
-      alert('Debes seleccionar al menos un rol.');
+      setError('Debes seleccionar al menos un rol.');
       return;
     }
 
@@ -71,22 +74,15 @@ export default function UserRegistrationModal({ isOpen, onClose, userToEdit, onU
 
       } else {
         // --- INVITAR nuevo usuario via Edge Function ---
-        // El usuario recibirá un correo con un link para establecer su contraseña
-        console.log('🔍 Enviando invitación via Edge Function...');
-
-        const { data, error } = await supabase.functions.invoke('invite-user', {
+        const { data, error: fnError } = await supabase.functions.invoke('invite-user', {
           body: { email, name, roles, active },
         });
 
-        if (error) {
-          console.error('❌ Error al invocar Edge Function:', error);
-
+        if (fnError) {
           // Capturar mensaje detallado devuelto por la Edge Function (400 / 500)
-          if (error instanceof FunctionsHttpError) {
+          if (fnError instanceof FunctionsHttpError) {
             try {
-              const details: any = await error.context.json();
-              console.error('📦 Detalles de error de Edge Function:', details);
-
+              const details: any = await fnError.context.json();
               if (details?.error) {
                 throw new Error(details.error);
               }
@@ -94,22 +90,18 @@ export default function UserRegistrationModal({ isOpen, onClose, userToEdit, onU
               // Si algo falla al leer el JSON, seguimos con el mensaje genérico
             }
           }
-
-          throw new Error(error.message);
+          throw new Error(fnError.message);
         }
 
         if (data?.error) {
           throw new Error(data.error);
         }
 
-        console.log('✅ Invitación enviada correctamente:', data?.id);
-
-        alert(`¡Invitación enviada exitosamente a ${email}! El usuario recibirá un correo para establecer su contraseña.`);
         onRefresh();
         onClose();
       }
-    } catch (error: any) {
-      alert('Error: ' + error.message);
+    } catch (err: any) {
+      setError(err.message || 'Ocurrió un error. Inténtalo de nuevo.');
     } finally {
       setLoading(false);
     }
@@ -189,6 +181,13 @@ export default function UserRegistrationModal({ isOpen, onClose, userToEdit, onU
             Este usuario está activo en el sistema
           </label>
         </div>
+
+        {/* Mensaje de error inline */}
+        {error && (
+          <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl">
+            {error}
+          </div>
+        )}
 
         <div className="flex justify-end gap-3 pt-4 border-t border-neutral-100">
           <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>

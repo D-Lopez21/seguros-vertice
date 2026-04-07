@@ -23,8 +23,6 @@ export const useRegistration = () => {
         },
       });
 
-      console.log('error: ', signUpError);
-
       if (signUpError) throw signUpError;
       return data;
     } catch (err: any) {

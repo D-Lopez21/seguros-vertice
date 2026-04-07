@@ -1,7 +1,8 @@
 import React from 'react';
-import { DashboardLayout, Button } from './common';
+import { DashboardLayout, Button, ConfirmDialog } from './common';
 import ProviderRegistrationModal from './ProviderRegistrationModal';
 import ProvidersTable from './ProvidersTable';
+import BillModal from './bills-details/BillModal';
 import { useGetAllProviders } from '../hooks/useGetAllProviders';
 import type { Profile } from '../contexts/AuthContext';
 
@@ -9,11 +10,18 @@ const PAGE_SIZE = 10;
 
 export default function ProvidersPage() {
   const { providers, loading, updateProvider, deleteProvider } = useGetAllProviders();
-  
+
   const [modalIsOpen, setModalIsOpen] = React.useState(false);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [providerToEdit, setProviderToEdit] = React.useState<Profile | null>(null);
   const [page, setPage] = React.useState(0);
+
+  const [confirmDialog, setConfirmDialog] = React.useState<{ isOpen: boolean; id: string; name: string; isLoading: boolean }>({
+    isOpen: false, id: '', name: '', isLoading: false,
+  });
+  const [notification, setNotification] = React.useState<{ isOpen: boolean; message: string; type: 'error' | 'success' | 'warning' | 'info' }>({
+    isOpen: false, message: '', type: 'error',
+  });
 
   const handleSearchChange = (value: string) => {
     setSearchTerm(value);
@@ -25,22 +33,31 @@ export default function ProvidersPage() {
     setModalIsOpen(true);
   };
 
-  const handleDelete = async (id: string, name: string) => {
-    if (window.confirm(`¿Seguro que deseas eliminar a ${name}?`)) {
-      try {
-        await deleteProvider(id);
-      } catch (error) {
-        console.error('Error al eliminar:', error);
-      }
+  const handleDelete = (id: string, name: string) => {
+    setConfirmDialog({ isOpen: true, id, name, isLoading: false });
+  };
+
+  const handleConfirmDelete = async () => {
+    setConfirmDialog((prev) => ({ ...prev, isLoading: true }));
+    try {
+      await deleteProvider(confirmDialog.id);
+      setConfirmDialog({ isOpen: false, id: '', name: '', isLoading: false });
+    } catch (err: any) {
+      setConfirmDialog({ isOpen: false, id: '', name: '', isLoading: false });
+      setNotification({
+        isOpen: true,
+        message: err.message || 'Error al eliminar el proveedor. Inténtalo de nuevo.',
+        type: 'error',
+      });
     }
   };
 
   return (
     <DashboardLayout title="Gestión de Proveedores" returnTo="/">
-      
+
       {/* SECCIÓN DE BOTÓN Y FILTRO */}
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6">
-        
+
         <div className="flex bg-white border border-neutral-200 rounded-lg p-1 shadow-sm w-full sm:w-auto">
           <div className="flex items-center px-3 text-neutral-400">
             <svg
@@ -66,7 +83,7 @@ export default function ProvidersPage() {
           />
         </div>
 
-        <Button 
+        <Button
           onClick={() => { setProviderToEdit(null); setModalIsOpen(true); }}
           className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-all duration-200"
         >
@@ -105,12 +122,24 @@ export default function ProvidersPage() {
         onClose={() => setModalIsOpen(false)}
         providerToEdit={providerToEdit}
         onUpdate={updateProvider}
-        onProviderRegistered={() => {
-          console.log('');
-          console.log('✅✅✅ PROVEEDOR GUARDADO EXITOSAMENTE ✅✅✅');
-          console.log('   Esperando actualización automática vía Realtime...');
-          console.log('');
-        }}
+        onProviderRegistered={() => {}}
+      />
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ isOpen: false, id: '', name: '', isLoading: false })}
+        onConfirm={handleConfirmDelete}
+        isLoading={confirmDialog.isLoading}
+        title="Eliminar proveedor"
+        message={`¿Seguro que deseas eliminar a ${confirmDialog.name}? Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+      />
+
+      <BillModal
+        isOpen={notification.isOpen}
+        onClose={() => setNotification((prev) => ({ ...prev, isOpen: false }))}
+        message={notification.message}
+        type={notification.type}
       />
     </DashboardLayout>
   );

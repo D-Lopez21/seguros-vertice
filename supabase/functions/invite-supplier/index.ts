@@ -22,16 +22,6 @@ Deno.serve(async (req) => {
     // Verificar secret de invitación
     const secretHeader = req.headers.get("x-invite-secret");
 
-    console.log('headers', req.headers)
-    
-    console.log('=== DEBUG AUTH ===')
-  console.log('Expected secret:', Deno.env.get("INVITE_SECRET"))
-  console.log('Provided secret:', secretHeader)
-  console.log('Match:', secretHeader === Deno.env.get("INVITE_SECRET"))
-  console.log('Expected length:', Deno.env.get("INVITE_SECRET")?.length)
-  console.log('Provided length:', secretHeader?.length)
-
-
     if (secretHeader !== Deno.env.get("INVITE_SECRET")) {
       return new Response(JSON.stringify({ error: "No autorizado" }), {
         status: 401,
@@ -42,8 +32,6 @@ Deno.serve(async (req) => {
     // Parsear datos del body
     const { email, fullName, rif } = await req.json();
 
-    console.log('request', { email, fullName, rif })
-    
     // Validaciones: para proveedor, RIF es OBLIGATORIO
     if (!email || !fullName || !rif) {
       return new Response(
@@ -121,7 +109,6 @@ Deno.serve(async (req) => {
     }
 
     const userId = authData.user.id;
-    console.log("✅ Proveedor creado en Auth:", userId);
 
     // Esperar que el trigger cree el perfil
     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -134,11 +121,9 @@ Deno.serve(async (req) => {
       .single();
 
     if (profileCheckError || !profile) {
-      console.error("❌ El trigger no creó el perfil:", profileCheckError);
+      console.error("El trigger no creó el perfil:", profileCheckError);
       throw new Error("Error: el perfil no se creó automáticamente");
     }
-
-    console.log("✅ Perfil de proveedor verificado:", profile);
 
     // 6. Asignar rol "proveedor" usando la misma tabla de roles/user_roles que para usuarios
     const { data: roleData, error: roleError } = await supabaseAdmin
@@ -148,7 +133,7 @@ Deno.serve(async (req) => {
       .single();
 
     if (roleError) {
-      console.error("❌ Error buscando rol 'proveedor':", roleError);
+      console.error("Error buscando rol 'proveedor':", roleError);
       throw roleError;
     }
 
@@ -167,11 +152,9 @@ Deno.serve(async (req) => {
       );
 
     if (userRolesError) {
-      console.error("❌ Error asignando rol 'proveedor':", userRolesError);
+      console.error("Error asignando rol 'proveedor':", userRolesError);
       throw userRolesError;
     }
-
-    console.log("✅ Rol 'proveedor' asignado correctamente");
 
     return new Response(
       JSON.stringify({
@@ -191,7 +174,7 @@ Deno.serve(async (req) => {
     );
 
   } catch (err: any) {
-    console.error("❌ Error en invite-supplier:", err);
+    console.error("Error en invite-supplier:", err);
     return new Response(
       JSON.stringify({ error: err.message || "Error interno del servidor" }),
       {

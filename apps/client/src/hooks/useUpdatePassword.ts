@@ -10,7 +10,6 @@ export const useUpdatePassword = () => {
   const updatePassword = async (newPassword: string) => {
     setLoading(true);
     setError(null);
-    console.log('--- Iniciando RPC ---'); // Debug 1
 
     try {
       const { data, error: rpcError } = await supabase.rpc(
@@ -20,12 +19,9 @@ export const useUpdatePassword = () => {
         },
       );
 
-      console.log('--- Respuesta recibida ---', { data, rpcError }); // Debug 2
-
       if (rpcError) throw rpcError;
       setSuccess(true);
     } catch (err: any) {
-      console.error('Error atrapado:', err);
       setError(err.message || 'Error de conexión con el servidor');
     } finally {
       setLoading(false);
