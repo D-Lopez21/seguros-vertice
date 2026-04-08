@@ -94,7 +94,12 @@ export function useGetAllUsers() {
         }
       }
 
-      setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, ...profileUpdates, roles: roles ?? u.roles } : u)));
+      if (profileUpdates.active === false) {
+        // Usuario desactivado → eliminarlo de la lista (mismo comportamiento que deleteUser)
+        setUsers((prev) => prev.filter((u) => u.id !== id));
+      } else {
+        setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, ...profileUpdates, roles: roles ?? u.roles } : u)));
+      }
       return true;
     } catch (err: any) {
       throw err;
