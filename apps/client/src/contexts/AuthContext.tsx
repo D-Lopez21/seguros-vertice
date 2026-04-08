@@ -46,7 +46,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const authInitializedRef = React.useRef(false);
   const hasSessionRef = React.useRef(false);
 
-  const fetchProfile = React.useCallback(async (currentUser: User): Promise<AuthUser> => {
+  const fetchProfile = React.useCallback(async (currentUser: User): Promise<AuthUser | null> => {
     try {
       // Traemos el perfil junto con sus roles relacionados
       const { data, error } = await supabase
@@ -57,6 +57,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       if (error) {
         return currentUser;
+      }
+
+      // Verificar si el usuario está desactivado
+      if (data.active === false) {
+        sessionStorage.setItem('auth_error', 'Tu cuenta ha sido desactivada. Contacta al administrador.');
+        await supabase.auth.signOut();
+        return null;
       }
 
       // Aplanamos los roles a un array de strings: ['admin', 'recepcion', ...]
@@ -158,6 +165,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (!isValid) return;
 
         const userWithProfile = await fetchProfile(initialSession.user);
+        if (!userWithProfile) return;
         setSession(initialSession);
         setUser(userWithProfile);
       }
@@ -191,6 +199,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
 
         const userWithProfile = await fetchProfile(currentSession.user);
+        if (!userWithProfile) return;
         setUser(userWithProfile);
       } else {
         setUser(null);

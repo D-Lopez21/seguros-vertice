@@ -19,7 +19,14 @@ export default function SignInPagePlayful() {
   const [password, setPassword] = React.useState('');
   const [passwordVisible, setPasswordVisible] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
-  const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = React.useState<string | null>(() => {
+    const stored = sessionStorage.getItem('auth_error');
+    if (stored) {
+      sessionStorage.removeItem('auth_error');
+      return stored;
+    }
+    return null;
+  });
 
   // --- Forgot Password ---
   const [forgotEmail, setForgotEmail] = React.useState('');
