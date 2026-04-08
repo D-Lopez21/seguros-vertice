@@ -38,6 +38,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [isLoading, setIsLoading] = React.useState(true);
   const [isActiveTab, setIsActiveTab] = React.useState(false);
   const [isChecking, setIsChecking] = React.useState(true);
+  const [hasAuthSession, setHasAuthSession] = React.useState<boolean | null>(null);
 
   const heartbeatIntervalRef = React.useRef<number | null>(null);
   const checkActiveTabIntervalRef = React.useRef<number | null>(null);
@@ -309,7 +310,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
   }, []);
 
-  if (isChecking) {
+  React.useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setHasAuthSession(!!session);
+    });
+  }, []);
+
+  if (isChecking || hasAuthSession === null) {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-cyan-50">
         <div className="flex items-center gap-2">
@@ -321,7 +328,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     );
   }
 
-  if (!isActiveTab) {
+  if (!isActiveTab && hasAuthSession === true) {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
         <div className="max-w-md w-full mx-4">
